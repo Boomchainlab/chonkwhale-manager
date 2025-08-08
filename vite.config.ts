@@ -1,10 +1,21 @@
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
+import path from 'path'
 
 export default defineConfig({
   plugins: [react()],
-  define: {
-    'import.meta.env.VITE_TEST_API_KEY': 'import.meta.env.VITE_PUBLISHABLE_KEY',
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, '.'),
+    },
   },
-  // /** rest of code here **/
+  test: {
+    environment: 'jsdom',
+    setupFiles: ['./vitest.setup.ts'],
+    globals: true,
+    css: true,
+    coverage: {
+      reporter: ['text', 'html'],
+    },
+  },
 })
