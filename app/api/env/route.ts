@@ -8,9 +8,7 @@ export async function GET(request: NextRequest) {
       NEXT_PUBLIC_REOWN_PROJECT_ID: process.env.NEXT_PUBLIC_REOWN_PROJECT_ID,
       NEXT_PUBLIC_WS_URL: process.env.NEXT_PUBLIC_WS_URL,
       NEXT_PUBLIC_EMAIL_ADDRESS: process.env.NEXT_PUBLIC_EMAIL_ADDRESS,
-      NEXT_PUBLIC_MINT_TOKEN_ADDRESS: process.env.NEXT_PUBLIC_MINT_TOKEN_ADDRESS,
       NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
-      CUSTOM_KEY: process.env.CUSTOM_KEY,
       // Add deployment info
       VERCEL_URL: process.env.VERCEL_URL,
       VERCEL_ENV: process.env.VERCEL_ENV,

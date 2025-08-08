@@ -6,7 +6,6 @@ export function getPublicConfig() {
   return {
     stripePublishableKey: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "",
     emailAddress: process.env.NEXT_PUBLIC_EMAIL_ADDRESS || "",
-    mintTokenAddress: process.env.NEXT_PUBLIC_MINT_TOKEN_ADDRESS || "",
   }
 }
 

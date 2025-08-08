@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 type EnvInfo = {
   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY?: string
   NEXT_PUBLIC_EMAIL_ADDRESS?: string
-  NEXT_PUBLIC_MINT_TOKEN_ADDRESS?: string
+  // Remove NEXT_PUBLIC_MINT_TOKEN_ADDRESS as it's sensitive
 }
 
 export default function ProjectViewer() {
@@ -18,7 +18,7 @@ export default function ProjectViewer() {
       try {
         const res = await fetch('/api/env', { cache: 'no-store' })
         const data = await res.json()
-        setEnv(data)
+        setEnv(data.environment)
       } catch {
         setEnv(null)
       } finally {
@@ -48,7 +48,7 @@ export default function ProjectViewer() {
               <ul className="list-disc pl-5">
                 <li>Publishable key: {mask(env?.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)}</li>
                 <li>Email address: {env?.NEXT_PUBLIC_EMAIL_ADDRESS || '(not set)'}</li>
-                <li>Mint token: {env?.NEXT_PUBLIC_MINT_TOKEN_ADDRESS || '(not set)'}</li>
+                {/* Remove mint token display as it's sensitive */}
               </ul>
             </div>
             <div className="grid gap-1">

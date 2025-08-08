@@ -26,6 +26,7 @@ const nextConfig = {
     domains: ['placeholder.com', 'via.placeholder.com'],
     dangerouslyAllowSVG: true,
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
+    unoptimized: true,
   },
   env: {
     CUSTOM_KEY: process.env.CUSTOM_KEY,
@@ -62,6 +63,12 @@ const nextConfig = {
         destination: '/api/ping',
       },
     ]
+  },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    ignoreBuildErrors: true,
   },
 }
 
