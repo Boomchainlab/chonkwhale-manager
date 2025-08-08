@@ -1,45 +1,73 @@
-import type { Request, Response, NextFunction } from "express";
+import type { Request, Response, NextFunction } from "express"
 import {
-  Registry,
   collectDefaultMetrics,
-  Histogram,
   Counter,
-} from "prom-client";
+  Histogram,
+  Registry,
+} from "prom-client"
+import { config } from "./config"
 
-export const register = new Registry();
-collectDefaultMetrics({ register });
+export const registry = new Registry()
+
+// Default Node/Process metrics
+collectDefaultMetrics({ register: registry })
+
+// HTTP metrics
+const httpRequestCounter = new Counter({
+  name: "http_requests_total",
+  help: "Total number of HTTP requests",
+  labelNames: ["method", "route", "status_code"] as const,
+  registers: [registry],
+})
 
 const httpRequestDuration = new Histogram({
   name: "http_request_duration_seconds",
   help: "HTTP request duration in seconds",
   labelNames: ["method", "route", "status_code"] as const,
-  buckets: [0.01, 0.05, 0.1, 0.25, 0.5, 1, 2, 5],
-  registers: [register],
-});
+  buckets: [0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10],
+  registers: [registry],
+})
 
-const httpRequestsTotal = new Counter({
-  name: "http_requests_total",
-  help: "Total number of HTTP requests",
-  labelNames: ["method", "route", "status_code"] as const,
-  registers: [register],
-});
+export function metricsMiddleware() {
+  return function (req: Request, res: Response, next: NextFunction) {
+    if (!config.enableMetrics) return next()
 
-export function metricsMiddleware(req: Request, res: Response, next: NextFunction) {
-  const method = req.method;
-  // Avoid high cardinality by using path without query string
-  const route = req.path || req.originalUrl || "unknown";
+    const start = process.hrtime.bigint()
+    const method = req.method
+    // capture route after response (when available)
+    res.on("finish", () => {
+      const status = res.statusCode
+      // route might be undefined (e.g., 404 or middleware-only)
+      const route =
+        (req as any).route?.path ||
+        (req as any).originalUrl ||
+        (req as any).url ||
+        "unknown"
 
-  const end = httpRequestDuration.startTimer({ method, route });
+      const end = process.hrtime.bigint()
+      const durationSeconds = Number(end - start) / 1_000_000_000
 
-  res.on("finish", () => {
-    const status = String(res.statusCode);
-    httpRequestsTotal.labels({ method, route, status_code: status }).inc();
-    end({ status_code: status });
-  });
+      httpRequestCounter
+        .labels(method, String(route), String(status))
+        .inc(1)
 
-  next();
+      httpRequestDuration
+        .labels(method, String(route), String(status))
+        .observe(durationSeconds)
+    })
+
+    next()
+  }
 }
 
-export async function getMetricsText(): Promise<string> {
-  return register.metrics();
+export async function metricsHandler(
+  _req: Request,
+  res: Response
+): Promise<void> {
+  if (!config.enableMetrics) {
+    res.status(404).json({ error: "metrics disabled" })
+    return
+  }
+  res.set("Content-Type", registry.contentType)
+  res.end(await registry.metrics())
 }
