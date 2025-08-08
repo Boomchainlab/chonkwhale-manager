@@ -1,94 +1,122 @@
 'use client'
 
-import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { TrendingUp, TrendingDown, Users, DollarSign, Activity, BarChart3 } from 'lucide-react'
+import { TrendingUp, TrendingDown, Users, DollarSign, Activity } from 'lucide-react'
+import { useEffect, useState } from 'react'
 
 interface MetricData {
-  label: string
+  title: string
   value: string
   change: string
-  trend: 'up' | 'down' | 'neutral'
+  changeType: 'positive' | 'negative' | 'neutral'
   icon: React.ReactNode
+  description: string
 }
 
 export function WhaleMetrics() {
   const [metrics, setMetrics] = useState<MetricData[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    // Mock real-time metrics
-    const updateMetrics = () => {
-      const newMetrics: MetricData[] = [
+    const fetchMetrics = async () => {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      
+      const mockMetrics: MetricData[] = [
         {
-          label: 'Total Whale Volume (24h)',
-          value: `$${(Math.random() * 500000 + 1000000).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`,
-          change: `${(Math.random() * 20 - 10).toFixed(1)}%`,
-          trend: Math.random() > 0.5 ? 'up' : 'down',
-          icon: <DollarSign className="h-4 w-4" />
+          title: 'Total Whale Volume',
+          value: '$12.4M',
+          change: '+8.2%',
+          changeType: 'positive',
+          icon: <DollarSign className="w-4 h-4" />,
+          description: '24h whale transaction volume'
         },
         {
-          label: 'Active Whales',
-          value: Math.floor(Math.random() * 50 + 150).toString(),
-          change: `${(Math.random() * 10 - 5).toFixed(1)}%`,
-          trend: Math.random() > 0.4 ? 'up' : 'down',
-          icon: <Users className="h-4 w-4" />
+          title: 'Active Whales',
+          value: '247',
+          change: '+12',
+          changeType: 'positive',
+          icon: <Users className="w-4 h-4" />,
+          description: 'Unique whale wallets active today'
         },
         {
-          label: 'Whale Transactions',
-          value: Math.floor(Math.random() * 100 + 500).toString(),
-          change: `${(Math.random() * 15 - 7.5).toFixed(1)}%`,
-          trend: Math.random() > 0.3 ? 'up' : 'down',
-          icon: <Activity className="h-4 w-4" />
+          title: 'Whale Transactions',
+          value: '1,834',
+          change: '-3.1%',
+          changeType: 'negative',
+          icon: <Activity className="w-4 h-4" />,
+          description: 'Large transactions (≥$50K) in 24h'
         },
         {
-          label: 'Average Transaction',
-          value: `${(Math.random() * 500 + 250).toFixed(0)}K CHONK9K`,
-          change: `${(Math.random() * 25 - 12.5).toFixed(1)}%`,
-          trend: Math.random() > 0.6 ? 'up' : 'down',
-          icon: <BarChart3 className="h-4 w-4" />
+          title: 'Buy/Sell Ratio',
+          value: '1.34',
+          change: '+0.12',
+          changeType: 'positive',
+          icon: <TrendingUp className="w-4 h-4" />,
+          description: 'Whale buy vs sell pressure'
         }
       ]
-      setMetrics(newMetrics)
+      
+      setMetrics(mockMetrics)
+      setIsLoading(false)
     }
 
-    updateMetrics()
-    const interval = setInterval(updateMetrics, 5000)
-
+    fetchMetrics()
+    const interval = setInterval(fetchMetrics, 60000) // Update every minute
     return () => clearInterval(interval)
   }, [])
 
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {[...Array(4)].map((_, i) => (
+          <Card key={i} className="bg-gray-800/50 border-gray-700">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <div className="w-4 h-4 bg-gray-600 rounded animate-pulse" />
+              <div className="w-8 h-8 bg-gray-600 rounded animate-pulse" />
+            </CardHeader>
+            <CardContent>
+              <div className="w-20 h-8 bg-gray-600 rounded animate-pulse mb-2" />
+              <div className="w-16 h-4 bg-gray-600 rounded animate-pulse" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    )
+  }
+
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
       {metrics.map((metric, index) => (
-        <Card key={index} className="bg-gray-800/50 border-gray-700">
+        <Card key={index} className="bg-gray-800/50 border-gray-700 hover:border-gray-600 transition-colors">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-gray-400">
-              {metric.label}
+              {metric.title}
             </CardTitle>
             <div className="text-gray-400">
               {metric.icon}
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-white mb-1">
-              {metric.value}
-            </div>
-            <div className="flex items-center text-xs">
-              {metric.trend === 'up' ? (
-                <TrendingUp className="h-3 w-3 text-green-400 mr-1" />
-              ) : metric.trend === 'down' ? (
-                <TrendingDown className="h-3 w-3 text-red-400 mr-1" />
-              ) : null}
-              <span className={
-                metric.trend === 'up' 
+            <div className="flex items-baseline space-x-2">
+              <div className="text-2xl font-bold text-white">
+                {metric.value}
+              </div>
+              <div className={`text-sm font-medium flex items-center ${
+                metric.changeType === 'positive' 
                   ? 'text-green-400' 
-                  : metric.trend === 'down' 
-                    ? 'text-red-400' 
-                    : 'text-gray-400'
-              }>
-                {metric.change} from last hour
-              </span>
+                  : metric.changeType === 'negative'
+                  ? 'text-red-400'
+                  : 'text-gray-400'
+              }`}>
+                {metric.changeType === 'positive' && <TrendingUp className="w-3 h-3 mr-1" />}
+                {metric.changeType === 'negative' && <TrendingDown className="w-3 h-3 mr-1" />}
+                {metric.change}
+              </div>
             </div>
+            <CardDescription className="text-xs text-gray-500 mt-1">
+              {metric.description}
+            </CardDescription>
           </CardContent>
         </Card>
       ))}

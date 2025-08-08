@@ -1,8 +1,8 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
-import { ThemeProvider } from '@/components/theme-provider'
 import { WalletProvider } from '@/components/wallet-provider'
+import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/sonner'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -10,8 +10,12 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: 'CHONK9K Whale Manager',
   description: 'Professional Solana Whale Tracking Platform',
-  icons: {
-    icon: '/placeholder-logo.png',
+  keywords: ['solana', 'whale', 'tracking', 'crypto', 'defi', 'analytics'],
+  authors: [{ name: 'CHONK9K Team' }],
+  openGraph: {
+    title: 'CHONK9K Whale Manager',
+    description: 'Track Solana whales with professional-grade analytics',
+    type: 'website',
   },
     generator: 'v0.dev'
 }
@@ -27,7 +31,7 @@ export default function RootLayout({
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"
-          enableSystem
+          enableSystem={false}
           disableTransitionOnChange
         >
           <WalletProvider>
