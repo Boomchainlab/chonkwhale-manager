@@ -1,161 +1,176 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { ArrowUpIcon, ArrowDownIcon, ExternalLinkIcon } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Activity, ExternalLink, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight } from 'lucide-react'
+import { toast } from 'sonner'
 
 interface WhaleTransaction {
   id: string
-  walletAddress: string
-  signature: string
-  transactionType: 'buy' | 'sell' | 'transfer'
-  tokenSymbol: string
+  wallet: string
+  type: 'buy' | 'sell'
   amount: number
-  usdValue: number
-  blockTime: string
-  knownEntity?: string
+  value: number
+  timestamp: Date
+  txHash: string
 }
 
 export function WhaleActivityFeed() {
   const [transactions, setTransactions] = useState<WhaleTransaction[]>([])
-  const [loading, setLoading] = useState(true)
+  const [isLive, setIsLive] = useState(true)
+
+  // Mock data generator
+  const generateMockTransaction = (): WhaleTransaction => {
+    const types: ('buy' | 'sell')[] = ['buy', 'sell']
+    const type = types[Math.floor(Math.random() * types.length)]
+    const amount = Math.floor(Math.random() * 1000000) + 100000
+    const value = amount * 0.00012 // Mock price
+    
+    return {
+      id: Math.random().toString(36).substr(2, 9),
+      wallet: `${Math.random().toString(36).substr(2, 4)}...${Math.random().toString(36).substr(2, 4)}`,
+      type,
+      amount,
+      value,
+      timestamp: new Date(),
+      txHash: Math.random().toString(36).substr(2, 16)
+    }
+  }
 
   useEffect(() => {
-    const fetchTransactions = async () => {
-      try {
-        const response = await fetch('/api/whale-transactions')
-        const data = await response.json()
-        setTransactions(data.transactions || [])
-      } catch (error) {
-        console.error('Failed to fetch whale transactions:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
+    // Initial load
+    const initialTransactions = Array.from({ length: 10 }, generateMockTransaction)
+    setTransactions(initialTransactions)
 
-    fetchTransactions()
-    const interval = setInterval(fetchTransactions, 10000) // Update every 10 seconds
+    // Live updates
+    const interval = setInterval(() => {
+      if (isLive) {
+        const newTransaction = generateMockTransaction()
+        setTransactions(prev => [newTransaction, ...prev.slice(0, 49)]) // Keep last 50
+        
+        if (newTransaction.amount > 500000) {
+          toast.success(`🐋 Large ${newTransaction.type} detected: ${newTransaction.amount.toLocaleString()} CHONK9K`)
+        }
+      }
+    }, 3000)
 
     return () => clearInterval(interval)
-  }, [])
-
-  const formatAddress = (address: string) => {
-    return `${address.slice(0, 4)}...${address.slice(-4)}`
-  }
+  }, [isLive])
 
   const formatAmount = (amount: number) => {
     if (amount >= 1000000) {
-      return `${(amount / 1000000).toFixed(2)}M`
-    } else if (amount >= 1000) {
-      return `${(amount / 1000).toFixed(2)}K`
+      return `${(amount / 1000000).toFixed(1)}M`
     }
-    return amount.toFixed(2)
-  }
-
-  const formatUSD = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value)
-  }
-
-  const getTransactionIcon = (type: string) => {
-    switch (type) {
-      case 'buy':
-        return <ArrowUpIcon className="h-4 w-4 text-green-400" />
-      case 'sell':
-        return <ArrowDownIcon className="h-4 w-4 text-red-400" />
-      default:
-        return <ExternalLinkIcon className="h-4 w-4 text-blue-400" />
+    if (amount >= 1000) {
+      return `${(amount / 1000).toFixed(1)}K`
     }
+    return amount.toString()
   }
 
-  const getTransactionColor = (type: string) => {
-    switch (type) {
-      case 'buy':
-        return 'text-green-400'
-      case 'sell':
-        return 'text-red-400'
-      default:
-        return 'text-blue-400'
-    }
+  const formatValue = (value: number) => {
+    return `$${value.toFixed(2)}`
   }
 
-  if (loading) {
-    return (
-      <Card className="bg-gray-800 border-gray-700">
-        <CardHeader>
-          <CardTitle className="text-white">Live Whale Activity</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="animate-pulse">
-                <div className="h-16 bg-gray-700 rounded-lg"></div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    )
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString('en-US', { 
+      hour12: false, 
+      hour: '2-digit', 
+      minute: '2-digit', 
+      second: '2-digit' 
+    })
   }
 
   return (
-    <Card className="bg-gray-800 border-gray-700">
+    <Card className="bg-gray-800/50 border-gray-700">
       <CardHeader>
-        <CardTitle className="text-white flex items-center justify-between">
-          Live Whale Activity
-          <div className="flex items-center space-x-2">
-            <div className="h-2 w-2 bg-green-400 rounded-full animate-pulse"></div>
-            <span className="text-sm text-gray-400">Real-time</span>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="text-white flex items-center gap-2">
+              <Activity className="h-5 w-5" />
+              Live Whale Activity
+            </CardTitle>
+            <CardDescription>
+              Real-time large CHONK9K transactions (100K+ tokens)
+            </CardDescription>
           </div>
-        </CardTitle>
+          <div className="flex items-center gap-2">
+            <Badge variant={isLive ? "default" : "secondary"} className="bg-green-500/20 text-green-400 border-green-500/30">
+              <div className={`w-2 h-2 rounded-full mr-2 ${isLive ? 'bg-green-400 animate-pulse' : 'bg-gray-400'}`}></div>
+              {isLive ? 'Live' : 'Paused'}
+            </Badge>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsLive(!isLive)}
+            >
+              {isLive ? 'Pause' : 'Resume'}
+            </Button>
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
-          {transactions.length === 0 ? (
-            <div className="text-center py-8 text-gray-400">
-              No whale transactions detected yet...
-            </div>
-          ) : (
-            transactions.map((tx) => (
+        <ScrollArea className="h-[600px] pr-4">
+          <div className="space-y-3">
+            {transactions.map((tx) => (
               <div
                 key={tx.id}
-                className="flex items-center justify-between p-4 bg-gray-700/50 rounded-lg hover:bg-gray-700 transition-colors"
+                className="flex items-center justify-between p-4 rounded-lg bg-gray-900/50 border border-gray-700 hover:border-gray-600 transition-colors"
               >
                 <div className="flex items-center space-x-4">
-                  {getTransactionIcon(tx.transactionType)}
-                  <div>
+                  <div className={`p-2 rounded-full ${
+                    tx.type === 'buy' 
+                      ? 'bg-green-500/20 text-green-400' 
+                      : 'bg-red-500/20 text-red-400'
+                  }`}>
+                    {tx.type === 'buy' ? (
+                      <ArrowUpRight className="h-4 w-4" />
+                    ) : (
+                      <ArrowDownRight className="h-4 w-4" />
+                    )}
+                  </div>
+                  
+                  <div className="space-y-1">
                     <div className="flex items-center space-x-2">
-                      <span className="text-white font-medium">
-                        {formatAddress(tx.walletAddress)}
-                      </span>
-                      {tx.knownEntity && (
-                        <Badge variant="secondary" className="text-xs">
-                          {tx.knownEntity}
-                        </Badge>
-                      )}
+                      <Badge variant="outline" className="text-xs">
+                        {tx.wallet}
+                      </Badge>
+                      <Badge 
+                        variant={tx.type === 'buy' ? 'default' : 'destructive'}
+                        className={tx.type === 'buy' ? 'bg-green-500/20 text-green-400 border-green-500/30' : ''}
+                      >
+                        {tx.type.toUpperCase()}
+                      </Badge>
                     </div>
                     <div className="text-sm text-gray-400">
-                      {new Date(tx.blockTime).toLocaleTimeString()}
+                      {formatTime(tx.timestamp)}
                     </div>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className={`font-medium ${getTransactionColor(tx.transactionType)}`}>
-                    {tx.transactionType.toUpperCase()} {formatAmount(tx.amount)} {tx.tokenSymbol}
+
+                <div className="text-right space-y-1">
+                  <div className="font-semibold text-white">
+                    {formatAmount(tx.amount)} CHONK9K
                   </div>
                   <div className="text-sm text-gray-400">
-                    {formatUSD(tx.usdValue)}
+                    {formatValue(tx.value)}
                   </div>
                 </div>
+
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="ml-4"
+                  onClick={() => window.open(`https://solscan.io/tx/${tx.txHash}`, '_blank')}
+                >
+                  <ExternalLink className="h-4 w-4" />
+                </Button>
               </div>
-            ))
-          )}
-        </div>
+            ))}
+          </div>
+        </ScrollArea>
       </CardContent>
     </Card>
   )

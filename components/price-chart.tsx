@@ -1,124 +1,151 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { TrendingUp, BarChart3 } from 'lucide-react'
 
 interface PriceData {
-  timestamp: string
+  time: string
   price: number
   volume: number
 }
 
 export function PriceChart() {
   const [priceData, setPriceData] = useState<PriceData[]>([])
-  const [loading, setLoading] = useState(true)
-  const [currentPrice, setCurrentPrice] = useState<number>(0)
-  const [priceChange24h, setPriceChange24h] = useState<number>(0)
+  const [currentPrice, setCurrentPrice] = useState(0.00012)
 
   useEffect(() => {
-    const fetchPriceData = async () => {
-      try {
-        const response = await fetch('/api/price-data')
-        const data = await response.json()
-        setPriceData(data.priceData || [])
-        setCurrentPrice(data.currentPrice || 0)
-        setPriceChange24h(data.priceChange24h || 0)
-      } catch (error) {
-        console.error('Failed to fetch price data:', error)
-      } finally {
-        setLoading(false)
+    // Generate mock price data for the last 24 hours
+    const generatePriceData = () => {
+      const data: PriceData[] = []
+      const now = new Date()
+      let price = 0.00012
+
+      for (let i = 23; i >= 0; i--) {
+        const time = new Date(now.getTime() - i * 60 * 60 * 1000)
+        price += (Math.random() - 0.5) * 0.000005
+        price = Math.max(0.00008, Math.min(0.00020, price))
+        
+        data.push({
+          time: time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+          price: Number(price.toFixed(6)),
+          volume: Math.floor(Math.random() * 1000000 + 500000)
+        })
       }
+
+      return data
     }
 
-    fetchPriceData()
-    const interval = setInterval(fetchPriceData, 30000) // Update every 30 seconds
+    const initialData = generatePriceData()
+    setPriceData(initialData)
+    setCurrentPrice(initialData[initialData.length - 1].price)
+
+    // Update price every 5 seconds
+    const interval = setInterval(() => {
+      setPriceData(prev => {
+        const newData = [...prev]
+        const lastPrice = newData[newData.length - 1].price
+        const newPrice = lastPrice + (Math.random() - 0.5) * 0.000002
+        const clampedPrice = Math.max(0.00008, Math.min(0.00020, newPrice))
+        
+        newData.push({
+          time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+          price: Number(clampedPrice.toFixed(6)),
+          volume: Math.floor(Math.random() * 1000000 + 500000)
+        })
+
+        // Keep only last 24 data points
+        if (newData.length > 24) {
+          newData.shift()
+        }
+
+        setCurrentPrice(clampedPrice)
+        return newData
+      })
+    }, 5000)
 
     return () => clearInterval(interval)
   }, [])
 
+  const priceChange = priceData.length > 1 
+    ? ((currentPrice - priceData[0].price) / priceData[0].price) * 100
+    : 0
+
   const formatPrice = (price: number) => {
-    if (price < 0.01) {
-      return `$${price.toFixed(6)}`
+    return `$${price.toFixed(6)}`
+  }
+
+  const formatVolume = (volume: number) => {
+    if (volume >= 1000000) {
+      return `${(volume / 1000000).toFixed(1)}M`
     }
-    return `$${price.toFixed(4)}`
-  }
-
-  const formatPercentage = (value: number) => {
-    const sign = value >= 0 ? '+' : ''
-    return `${sign}${value.toFixed(2)}%`
-  }
-
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-gray-800 border border-gray-600 rounded-lg p-3">
-          <p className="text-gray-300 text-sm">
-            {new Date(label).toLocaleString()}
-          </p>
-          <p className="text-green-400 font-medium">
-            Price: {formatPrice(payload[0].value)}
-          </p>
-        </div>
-      )
+    if (volume >= 1000) {
+      return `${(volume / 1000).toFixed(1)}K`
     }
-    return null
-  }
-
-  if (loading) {
-    return (
-      <Card className="bg-gray-800 border-gray-700">
-        <CardHeader>
-          <CardTitle className="text-white">CHONK Price Chart</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="animate-pulse">
-            <div className="h-64 bg-gray-700 rounded-lg"></div>
-          </div>
-        </CardContent>
-      </Card>
-    )
+    return volume.toString()
   }
 
   return (
-    <Card className="bg-gray-800 border-gray-700">
+    <Card className="bg-gray-800/50 border-gray-700">
       <CardHeader>
-        <CardTitle className="text-white flex items-center justify-between">
-          <span>CHONK Price Chart</span>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="text-white flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              CHONK9K Price Chart
+            </CardTitle>
+            <CardDescription>
+              24-hour price movement and volume
+            </CardDescription>
+          </div>
           <div className="text-right">
             <div className="text-2xl font-bold text-white">
               {formatPrice(currentPrice)}
             </div>
-            <div className={`text-sm ${priceChange24h >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-              {formatPercentage(priceChange24h)} (24h)
+            <div className={`flex items-center gap-1 text-sm ${
+              priceChange >= 0 ? 'text-green-400' : 'text-red-400'
+            }`}>
+              <TrendingUp className={`h-3 w-3 ${priceChange < 0 ? 'rotate-180' : ''}`} />
+              {priceChange >= 0 ? '+' : ''}{priceChange.toFixed(2)}% (24h)
             </div>
           </div>
-        </CardTitle>
+        </div>
       </CardHeader>
       <CardContent>
-        <div className="h-64">
+        <div className="h-[400px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={priceData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-              <XAxis
-                dataKey="timestamp"
-                tickFormatter={(value) => new Date(value).toLocaleTimeString()}
+              <XAxis 
+                dataKey="time" 
                 stroke="#9CA3AF"
                 fontSize={12}
               />
-              <YAxis
+              <YAxis 
+                stroke="#9CA3AF"
+                fontSize={12}
                 tickFormatter={formatPrice}
-                stroke="#9CA3AF"
-                fontSize={12}
               />
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: '#1F2937',
+                  border: '1px solid #374151',
+                  borderRadius: '8px',
+                  color: '#F9FAFB'
+                }}
+                formatter={(value: number, name: string) => [
+                  name === 'price' ? formatPrice(value) : formatVolume(value),
+                  name === 'price' ? 'Price' : 'Volume'
+                ]}
+              />
               <Line
                 type="monotone"
                 dataKey="price"
-                stroke="#10B981"
+                stroke="#8B5CF6"
                 strokeWidth={2}
                 dot={false}
-                activeDot={{ r: 4, fill: '#10B981' }}
+                activeDot={{ r: 4, stroke: '#8B5CF6', strokeWidth: 2 }}
               />
             </LineChart>
           </ResponsiveContainer>

@@ -1,151 +1,138 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { TrophyIcon, ExternalLinkIcon } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Users, ExternalLink, TrendingUp, TrendingDown } from 'lucide-react'
 
-interface TopWhale {
-  walletAddress: string
-  balance: number
-  usdValue: number
-  knownEntity?: string
-  tags: string[]
+interface WhaleData {
   rank: number
+  wallet: string
+  balance: number
+  percentage: number
+  change24h: number
+  lastActivity: string
 }
 
 export function TopWhales() {
-  const [whales, setWhales] = useState<TopWhale[]>([])
-  const [loading, setLoading] = useState(true)
+  const [whales, setWhales] = useState<WhaleData[]>([])
 
   useEffect(() => {
-    const fetchTopWhales = async () => {
-      try {
-        const response = await fetch('/api/top-whales')
-        const data = await response.json()
-        setWhales(data.whales || [])
-      } catch (error) {
-        console.error('Failed to fetch top whales:', error)
-      } finally {
-        setLoading(false)
-      }
+    // Mock whale data
+    const generateWhaleData = (): WhaleData[] => {
+      return Array.from({ length: 20 }, (_, i) => ({
+        rank: i + 1,
+        wallet: `${Math.random().toString(36).substr(2, 4)}...${Math.random().toString(36).substr(2, 4)}`,
+        balance: Math.floor(Math.random() * 10000000 + 1000000),
+        percentage: Math.random() * 5 + 0.1,
+        change24h: (Math.random() - 0.5) * 20,
+        lastActivity: `${Math.floor(Math.random() * 24)}h ago`
+      })).sort((a, b) => b.balance - a.balance)
     }
 
-    fetchTopWhales()
-    const interval = setInterval(fetchTopWhales, 60000) // Update every minute
+    setWhales(generateWhaleData())
+
+    // Update every 30 seconds
+    const interval = setInterval(() => {
+      setWhales(generateWhaleData())
+    }, 30000)
 
     return () => clearInterval(interval)
   }, [])
 
-  const formatAddress = (address: string) => {
-    return `${address.slice(0, 6)}...${address.slice(-4)}`
-  }
-
-  const formatUSD = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value)
-  }
-
   const formatBalance = (balance: number) => {
     if (balance >= 1000000) {
-      return `${(balance / 1000000).toFixed(2)}M`
-    } else if (balance >= 1000) {
-      return `${(balance / 1000).toFixed(2)}K`
+      return `${(balance / 1000000).toFixed(1)}M`
     }
-    return balance.toFixed(2)
+    if (balance >= 1000) {
+      return `${(balance / 1000).toFixed(1)}K`
+    }
+    return balance.toString()
   }
 
-  const getRankIcon = (rank: number) => {
-    if (rank === 1) return <TrophyIcon className="h-4 w-4 text-yellow-400" />
-    if (rank === 2) return <TrophyIcon className="h-4 w-4 text-gray-300" />
-    if (rank === 3) return <TrophyIcon className="h-4 w-4 text-amber-600" />
-    return <span className="text-sm font-bold text-gray-400">#{rank}</span>
+  const formatPercentage = (percentage: number) => {
+    return `${percentage.toFixed(2)}%`
   }
 
-  const openSolscan = (address: string) => {
-    window.open(`https://solscan.io/account/${address}`, '_blank')
-  }
-
-  if (loading) {
-    return (
-      <Card className="bg-gray-800 border-gray-700">
-        <CardHeader>
-          <CardTitle className="text-white">Top Whales</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {[...Array(10)].map((_, i) => (
-              <div key={i} className="animate-pulse">
-                <div className="h-16 bg-gray-700 rounded-lg"></div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    )
+  const formatChange = (change: number) => {
+    const sign = change >= 0 ? '+' : ''
+    return `${sign}${change.toFixed(1)}%`
   }
 
   return (
-    <Card className="bg-gray-800 border-gray-700">
+    <Card className="bg-gray-800/50 border-gray-700">
       <CardHeader>
-        <CardTitle className="text-white flex items-center space-x-2">
-          <TrophyIcon className="h-5 w-5 text-yellow-400" />
-          <span>Top Whales</span>
+        <CardTitle className="text-white flex items-center gap-2">
+          <Users className="h-5 w-5" />
+          Top CHONK9K Whales
         </CardTitle>
+        <CardDescription>
+          Largest token holders and their recent activity
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="space-y-3">
-          {whales.length === 0 ? (
-            <div className="text-center py-4 text-gray-400">
-              No whale data available
-            </div>
-          ) : (
-            whales.map((whale) => (
-              <div
-                key={whale.walletAddress}
-                className="flex items-center justify-between p-3 bg-gray-700/50 rounded-lg hover:bg-gray-700 transition-colors cursor-pointer"
-                onClick={() => openSolscan(whale.walletAddress)}
-              >
-                <div className="flex items-center space-x-3">
-                  {getRankIcon(whale.rank)}
-                  <div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-white font-medium">
-                        {formatAddress(whale.walletAddress)}
+        <div className="rounded-md border border-gray-700">
+          <Table>
+            <TableHeader>
+              <TableRow className="border-gray-700 hover:bg-gray-800/50">
+                <TableHead className="text-gray-300">Rank</TableHead>
+                <TableHead className="text-gray-300">Wallet</TableHead>
+                <TableHead className="text-gray-300">Balance</TableHead>
+                <TableHead className="text-gray-300">% of Supply</TableHead>
+                <TableHead className="text-gray-300">24h Change</TableHead>
+                <TableHead className="text-gray-300">Last Activity</TableHead>
+                <TableHead className="text-gray-300">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {whales.map((whale) => (
+                <TableRow key={whale.wallet} className="border-gray-700 hover:bg-gray-800/30">
+                  <TableCell className="font-medium text-white">
+                    #{whale.rank}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="font-mono text-xs">
+                        {whale.wallet}
+                      </Badge>
+                    </div>
+                  </TableCell>
+                  <TableCell className="font-semibold text-white">
+                    {formatBalance(whale.balance)} CHONK9K
+                  </TableCell>
+                  <TableCell className="text-gray-300">
+                    {formatPercentage(whale.percentage)}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1">
+                      {whale.change24h >= 0 ? (
+                        <TrendingUp className="h-3 w-3 text-green-400" />
+                      ) : (
+                        <TrendingDown className="h-3 w-3 text-red-400" />
+                      )}
+                      <span className={whale.change24h >= 0 ? 'text-green-400' : 'text-red-400'}>
+                        {formatChange(whale.change24h)}
                       </span>
-                      <ExternalLinkIcon className="h-3 w-3 text-gray-400" />
                     </div>
-                    {whale.knownEntity && (
-                      <div className="text-sm text-gray-400">{whale.knownEntity}</div>
-                    )}
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {whale.tags.map((tag) => (
-                        <Badge
-                          key={tag}
-                          variant="secondary"
-                          className="text-xs bg-gray-600 text-gray-300"
-                        >
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-white font-medium">
-                    {formatBalance(whale.balance)} CHONK
-                  </div>
-                  <div className="text-sm text-gray-400">
-                    {formatUSD(whale.usdValue)}
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
+                  </TableCell>
+                  <TableCell className="text-gray-400">
+                    {whale.lastActivity}
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => window.open(`https://solscan.io/account/${whale.wallet}`, '_blank')}
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </div>
       </CardContent>
     </Card>

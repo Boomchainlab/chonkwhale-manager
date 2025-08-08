@@ -1,148 +1,97 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { TrendingUpIcon, TrendingDownIcon, DollarSignIcon, ActivityIcon } from 'lucide-react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { TrendingUp, TrendingDown, Users, DollarSign, Activity, BarChart3 } from 'lucide-react'
 
-interface WhaleMetrics {
-  totalWhales: number
-  totalVolume24h: number
-  averageTransactionSize: number
-  activeWhales24h: number
-  volumeChange24h: number
-  whaleChange24h: number
+interface MetricData {
+  label: string
+  value: string
+  change: string
+  trend: 'up' | 'down' | 'neutral'
+  icon: React.ReactNode
 }
 
 export function WhaleMetrics() {
-  const [metrics, setMetrics] = useState<WhaleMetrics | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [metrics, setMetrics] = useState<MetricData[]>([])
 
   useEffect(() => {
-    const fetchMetrics = async () => {
-      try {
-        const response = await fetch('/api/whale-metrics')
-        const data = await response.json()
-        setMetrics(data.metrics)
-      } catch (error) {
-        console.error('Failed to fetch whale metrics:', error)
-      } finally {
-        setLoading(false)
-      }
+    // Mock real-time metrics
+    const updateMetrics = () => {
+      const newMetrics: MetricData[] = [
+        {
+          label: 'Total Whale Volume (24h)',
+          value: `$${(Math.random() * 500000 + 1000000).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`,
+          change: `${(Math.random() * 20 - 10).toFixed(1)}%`,
+          trend: Math.random() > 0.5 ? 'up' : 'down',
+          icon: <DollarSign className="h-4 w-4" />
+        },
+        {
+          label: 'Active Whales',
+          value: Math.floor(Math.random() * 50 + 150).toString(),
+          change: `${(Math.random() * 10 - 5).toFixed(1)}%`,
+          trend: Math.random() > 0.4 ? 'up' : 'down',
+          icon: <Users className="h-4 w-4" />
+        },
+        {
+          label: 'Whale Transactions',
+          value: Math.floor(Math.random() * 100 + 500).toString(),
+          change: `${(Math.random() * 15 - 7.5).toFixed(1)}%`,
+          trend: Math.random() > 0.3 ? 'up' : 'down',
+          icon: <Activity className="h-4 w-4" />
+        },
+        {
+          label: 'Average Transaction',
+          value: `${(Math.random() * 500 + 250).toFixed(0)}K CHONK9K`,
+          change: `${(Math.random() * 25 - 12.5).toFixed(1)}%`,
+          trend: Math.random() > 0.6 ? 'up' : 'down',
+          icon: <BarChart3 className="h-4 w-4" />
+        }
+      ]
+      setMetrics(newMetrics)
     }
 
-    fetchMetrics()
-    const interval = setInterval(fetchMetrics, 30000) // Update every 30 seconds
+    updateMetrics()
+    const interval = setInterval(updateMetrics, 5000)
 
     return () => clearInterval(interval)
   }, [])
 
-  const formatNumber = (num: number) => {
-    if (num >= 1000000) {
-      return `${(num / 1000000).toFixed(2)}M`
-    } else if (num >= 1000) {
-      return `${(num / 1000).toFixed(2)}K`
-    }
-    return num.toFixed(0)
-  }
-
-  const formatUSD = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value)
-  }
-
-  const formatPercentage = (value: number) => {
-    const sign = value >= 0 ? '+' : ''
-    return `${sign}${value.toFixed(2)}%`
-  }
-
-  if (loading || !metrics) {
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {[...Array(4)].map((_, i) => (
-          <Card key={i} className="bg-gray-800 border-gray-700">
-            <CardContent className="p-6">
-              <div className="animate-pulse">
-                <div className="h-4 bg-gray-700 rounded w-3/4 mb-2"></div>
-                <div className="h-8 bg-gray-700 rounded w-1/2"></div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    )
-  }
-
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-      <Card className="bg-gray-800 border-gray-700">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-400">Total Whales</p>
-              <p className="text-2xl font-bold text-white">{formatNumber(metrics.totalWhales)}</p>
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      {metrics.map((metric, index) => (
+        <Card key={index} className="bg-gray-800/50 border-gray-700">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-gray-400">
+              {metric.label}
+            </CardTitle>
+            <div className="text-gray-400">
+              {metric.icon}
             </div>
-            <div className="flex items-center space-x-1">
-              {metrics.whaleChange24h >= 0 ? (
-                <TrendingUpIcon className="h-4 w-4 text-green-400" />
-              ) : (
-                <TrendingDownIcon className="h-4 w-4 text-red-400" />
-              )}
-              <span className={`text-sm ${metrics.whaleChange24h >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                {formatPercentage(metrics.whaleChange24h)}
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-white mb-1">
+              {metric.value}
+            </div>
+            <div className="flex items-center text-xs">
+              {metric.trend === 'up' ? (
+                <TrendingUp className="h-3 w-3 text-green-400 mr-1" />
+              ) : metric.trend === 'down' ? (
+                <TrendingDown className="h-3 w-3 text-red-400 mr-1" />
+              ) : null}
+              <span className={
+                metric.trend === 'up' 
+                  ? 'text-green-400' 
+                  : metric.trend === 'down' 
+                    ? 'text-red-400' 
+                    : 'text-gray-400'
+              }>
+                {metric.change} from last hour
               </span>
             </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-gray-800 border-gray-700">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-400">24h Volume</p>
-              <p className="text-2xl font-bold text-white">{formatUSD(metrics.totalVolume24h)}</p>
-            </div>
-            <div className="flex items-center space-x-1">
-              {metrics.volumeChange24h >= 0 ? (
-                <TrendingUpIcon className="h-4 w-4 text-green-400" />
-              ) : (
-                <TrendingDownIcon className="h-4 w-4 text-red-400" />
-              )}
-              <span className={`text-sm ${metrics.volumeChange24h >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                {formatPercentage(metrics.volumeChange24h)}
-              </span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-gray-800 border-gray-700">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-400">Avg Transaction</p>
-              <p className="text-2xl font-bold text-white">{formatUSD(metrics.averageTransactionSize)}</p>
-            </div>
-            <DollarSignIcon className="h-8 w-8 text-blue-400" />
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-gray-800 border-gray-700">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-400">Active Whales</p>
-              <p className="text-2xl font-bold text-white">{formatNumber(metrics.activeWhales24h)}</p>
-            </div>
-            <ActivityIcon className="h-8 w-8 text-purple-400" />
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      ))}
     </div>
   )
 }
