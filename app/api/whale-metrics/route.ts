@@ -11,6 +11,11 @@ interface WhaleMetrics {
   buyVsSellRatio: number
 }
 
+/**
+ * Handles GET requests by generating and returning randomized whale metrics data as a JSON response.
+ *
+ * The response includes metrics such as total whales, 24-hour volume, average transaction size, active whales, volume and whale count changes, largest transaction, buy vs sell ratio, and a timestamp. Returns a failure response with status 500 if an error occurs.
+ */
 export async function GET(request: NextRequest) {
   try {
     // Generate realistic mock metrics

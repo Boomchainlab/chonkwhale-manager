@@ -34,6 +34,11 @@ let alerts: Alert[] = [
   }
 ]
 
+/**
+ * Updates an existing alert by its ID with the provided data.
+ *
+ * Accepts a JSON body containing alert fields to update. Returns a JSON response with the updated alert on success, or an error message if the alert is not found or an error occurs.
+ */
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -65,6 +70,11 @@ export async function PATCH(
   }
 }
 
+/**
+ * Deletes an alert identified by the provided `id` from the in-memory alerts array.
+ *
+ * Returns a JSON response indicating success or failure. If the alert does not exist, responds with a 404 status and error message.
+ */
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }

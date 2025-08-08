@@ -42,6 +42,11 @@ const generateMockTransaction = (): WhaleTransaction => {
   }
 }
 
+/**
+ * Handles GET requests by returning a JSON response with a list of 20 mock whale transactions.
+ *
+ * The response includes a success flag, the sorted transactions array, and the total count. If an error occurs, returns a failure flag and an error message with a 500 status code.
+ */
 export async function GET(request: NextRequest) {
   try {
     // Generate mock transactions

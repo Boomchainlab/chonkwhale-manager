@@ -5,6 +5,11 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2024-06-20'
 })
 
+/**
+ * Handles POST requests to create a Stripe checkout session for a subscription.
+ *
+ * Expects a JSON body with a `priceId` and optional `successUrl` and `cancelUrl`. Returns a JSON response with the session ID and URL on success, or an error message on failure.
+ */
 export async function POST(request: NextRequest) {
   try {
     const { priceId, successUrl, cancelUrl } = await request.json()

@@ -23,6 +23,11 @@ interface PriceStats {
   low24h: number
 }
 
+/**
+ * Displays a real-time price chart and key statistics for the CHONK token using mock data.
+ *
+ * Shows current price, 24-hour volume, market capitalization, and 24-hour price range, along with a selectable timeframe and a responsive line chart. Data is refreshed every minute and updates when the selected timeframe changes.
+ */
 export function PriceChart() {
   const [priceData, setPriceData] = useState<PriceData[]>([])
   const [stats, setStats] = useState<PriceStats | null>(null)

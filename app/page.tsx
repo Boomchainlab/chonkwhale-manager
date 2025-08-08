@@ -7,6 +7,11 @@ import { WalletConnectButton } from '@/components/wallet-connect-button'
 import { Activity, TrendingUp, Bell, Users, BarChart3 } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
+/**
+ * Renders the Solana Whale Dashboard interface with tabbed navigation for whale metrics, activity, top whales, price chart, and alerts.
+ *
+ * The dashboard includes a sticky header with branding and wallet connection, a descriptive introduction, and a tabbed main content area displaying relevant whale tracking components.
+ */
 export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">

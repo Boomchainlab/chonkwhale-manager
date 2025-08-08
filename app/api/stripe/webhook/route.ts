@@ -7,6 +7,14 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!
 
+/**
+ * Handles incoming Stripe webhook events, verifies their signatures, and logs relevant event information.
+ *
+ * Verifies the Stripe webhook signature using the configured secret. Processes supported event types by logging their details. Returns a JSON response indicating success or failure.
+ *
+ * @param request - The incoming Next.js API request containing the Stripe webhook event
+ * @returns A JSON response indicating whether the webhook was successfully processed
+ */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.text()

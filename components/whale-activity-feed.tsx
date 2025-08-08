@@ -18,6 +18,11 @@ interface WhaleTransaction {
   usdValue: number
 }
 
+/**
+ * Displays a live feed of large cryptocurrency transactions ("whale activity") using mock data.
+ *
+ * Shows recent buy and sell transactions with formatted amounts, USD values, wallet addresses, and relative timestamps. Includes a refresh button and periodically updates the feed every 30 seconds.
+ */
 export function WhaleActivityFeed() {
   const [transactions, setTransactions] = useState<WhaleTransaction[]>([])
   const [isLoading, setIsLoading] = useState(false)

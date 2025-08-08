@@ -62,6 +62,11 @@ const generateMockAlertHistory = (): AlertHistory[] => {
   return alerts.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
 }
 
+/**
+ * Handles GET requests to retrieve a mock alert history dataset.
+ *
+ * Returns a JSON response containing a list of mock alert history entries, the total count, and the current timestamp. On error, returns a failure response with HTTP status 500.
+ */
 export async function GET(request: NextRequest) {
   try {
     const history = generateMockAlertHistory()

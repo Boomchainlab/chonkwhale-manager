@@ -20,6 +20,11 @@ interface Alert {
   triggered: number
 }
 
+/**
+ * Displays and manages a list of custom whale activity alerts, allowing users to create, enable/disable, and delete alerts locally.
+ *
+ * Provides a form for creating new alerts with configurable name, type, condition, and value. Shows all existing alerts with controls to toggle their enabled state or remove them. Alerts are managed entirely in local state and are not persisted.
+ */
 export function AlertsPanel() {
   const [alerts, setAlerts] = useState<Alert[]>([
     {
