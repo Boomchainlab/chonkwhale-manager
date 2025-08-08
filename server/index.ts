@@ -1,136 +1,74 @@
-import express from "express";
-import Stripe from "stripe";
-import { sql, pingDb } from "./db";
-import { validateEnv, printSafeConfig, config } from "./config";
-import { registerRoutes } from "./routes";
+/import express from "express";
+import helmet from "helmet";
+import cors, { type CorsOptions } from "cors";
+import compression from "compression";
+import rateLimit from "express-rate-limit";
+import pinoHttp from "pino-http";
+import { nanoid } from "nanoid";
+import { config } from "./config";
+import { metricsMiddleware, getMetricsText, register as metricsRegister } from "./metrics";
 
-async function bootstrap() {
-  const app = express();
+const app = express();
 
-  // Middleware to preserve raw body for Stripe webhook verification
-  app.use(
-    express.json({
-      verify: (req, _res, buf) => {
-        try {
-          const url = req.originalUrl || req.url || "";
-          if (url.startsWith("/api/stripe/webhook")) {
-            (req as any).rawBody = buf.toString("utf8");
-          }
-        } catch {
-          // ignore
-        }
+app.disable("x-powered-by");
+app.set("trust proxy", 1);
+
+app.use(
+  pinoHttp({
+    genReqId: (req, res) => {
+      const existing = req.headers["x-request-id"];
+      if (typeof existing === "string") return existing;
+      const id = nanoid();
+      res.setHeader("x-request-id", id);
+      return id;
+    },
+    autoLogging: {
+      ignorePaths: ["/api/health", "/api/ready", "/api/metrics"],
+    },
+    redact: {
+      paths: ["req.headers.authorization", "req.headers.cookie"],
+      remove: true,
+    },
+  })
+);
+
+const allowedOrigins = config.corsAllowedOrigins;
+const corsOptions: CorsOptions = allowedOrigins.length
+  ? {
+      origin(origin, callback) {
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.includes(origin)) return callback(null, true);
+        return callback(new Error("Not allowed by CORS"));
       },
-    })
-  );
-  app.use(express.urlencoded({ extended: false }));
-
-  // Validate env and print safe config in development
-  try {
-    validateEnv();
-    if (app.get("env") !== "production") {
-      console.log("Server configuration (safe):", printSafeConfig());
+      credentials: true,
     }
-  } catch (e) {
-    console.error("Environment validation failed:", (e as Error).message);
-    process.exit(1);
-  }
+  : { origin: true, credentials: false };
 
-  // Stripe Checkout route (server-only)
-  const stripeApiKey = process.env.STRIPE_SECRET_KEY || process.env.STRIPE_TEST_API_KEY || "";
-  const stripe = stripeApiKey ? new Stripe(stripeApiKey, { apiVersion: "2024-06-20" as any }) : null;
+app.use(cors(corsOptions));
+app.use(
+  helmet({
+    contentSecurityPolicy:
+      app.get("env") === "production"
+        ? undefined
+        : false, // disable CSP in dev to ease HMR
+    crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
+  })
+);
+app.use(compression());
 
-  app.post("/api/stripe/checkout", async (req, res) => {
-    try {
-      if (!stripe) {
-        return res.status(503).json({ message: "Stripe not configured" });
-      }
-      const { priceId, lineItems, quantity = 1, mode = "subscription", successUrl, cancelUrl } = req.body || {};
-
-      const resolvedLineItems =
-        Array.isArray(lineItems) && lineItems.length > 0
-          ? lineItems
-          : priceId
-          ? [{ price: String(priceId), quantity: Number(quantity) || 1 }]
-          : null;
-
-      if (!resolvedLineItems) {
-        return res.status(400).json({ message: "Missing lineItems or priceId" });
-      }
-
-      const proto = req.protocol;
-      const host = req.get("host");
-      const defaultSuccess = `${proto}://${host}/?checkout=success`;
-      const defaultCancel = `${proto}://${host}/?checkout=cancel`;
-
-      const session = await stripe.checkout.sessions.create({
-        mode: mode === "payment" ? "payment" : "subscription",
-        line_items: resolvedLineItems,
-        success_url: successUrl || defaultSuccess,
-        cancel_url: cancelUrl || defaultCancel,
-        allow_promotion_codes: true,
-      });
-
-      return res.json({ id: session.id, url: session.url });
-    } catch (err) {
-      return res.status(500).json({ message: (err as Error).message });
-    }
-  });
-
-  // Stripe Webhook route with signature verification
-  app.post("/api/stripe/webhook", async (req, res) => {
-    const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-    const sig = req.headers["stripe-signature"];
-    if (!stripe || !stripeWebhookSecret || !sig) {
-      return res.status(400).send("Webhook misconfigured");
-    }
-    try {
-      const rawBody = (req as any).rawBody || "";
-      const event = stripe.webhooks.constructEvent(rawBody, String(sig), stripeWebhookSecret);
-
-      // Handle events
-      switch (event.type) {
-        case "checkout.session.completed": {
-          const session = event.data.object as any;
-          // TODO: fulfill order, provision access, etc.
-          break;
-        }
-        case "customer.subscription.created":
-        case "customer.subscription.updated":
-        case "customer.subscription.deleted": {
-          // TODO: update subscription status in DB
-          break;
-        }
-        default:
-          // no-op
-          break;
-      }
-
-      return res.json({ received: true });
-    } catch (err) {
-      return res.status(400).send(`Webhook Error: ${(err as Error).message}`);
-    }
-  });
-
-  // Neon SQL readiness probe
-  app.get("/api/ready", async (_req, res) => {
-    if (!process.env.DATABASE_URL) {
-      return res.json({ status: "ready", db: "not-configured" });
-    }
-    const result = await pingDb();
-    if (result.ok) {
-      return res.json({ status: "ready", db: "ok" });
-    }
-    return res.status(503).json({ status: "not-ready", db: "error", error: result.error });
-  });
-
-  const server = await registerRoutes(app);
-  const port = config.port;
-  server.listen(port, () => {
-    console.log(`CHONK9K Whale Manager server listening on :${port}`);
-  });
-}
-
-bootstrap().catch((e) => {
-  console.error("Fatal startup error:", e);
-  process.exit(1);
+const apiLimiter = rateLimit({
+  windowMs: config.rateLimitWindowMs,
+  max: config.rateLimitMax,
+  standardHeaders: true,
+  legacyHeaders: false,
 });
+app.use("/api", apiLimiter);
+
+app.use(metricsMiddleware);
+
+app.get("/api/metrics", async (_req, res) => {
+  res.setHeader("Content-Type", metricsRegister.contentType);
+  res.send(await getMetricsText());
+});
+
+// ** rest of code here **

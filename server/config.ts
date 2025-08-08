@@ -1,76 +1,47 @@
-/**
- * Centralized, typed configuration and basic validation.
- * Do not hardcode secrets; read from process.env (set via host UI).
- */
-export type AppConfig = {
-  nodeEnv: string;
-  isProduction: boolean;
-  port: number;
-
-  // Secrets (server-only)
-  sessionSecret?: string;
-  stripeSecretKey?: string;
-  stripeWebhookSecret?: string;
-
-  // Database
-  databaseUrl?: string;
-
-  // CORS / Allowed origins (CSV)
-  allowedOrigins: string[];
-};
+import ms from "ms";
 
 function parseNumber(value: string | undefined, fallback: number): number {
-  if (!value) return fallback;
-  const n = Number(value);
+  const n = value ? Number(value) : NaN;
   return Number.isFinite(n) ? n : fallback;
 }
 
-function parseCsv(value: string | undefined): string[] {
-  if (!value) return [];
-  return value
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
+function parseMs(value: string | undefined, fallback: number): number {
+  if (!value) return fallback;
+  const asNum = Number(value);
+  if (Number.isFinite(asNum)) return asNum;
+  const parsed = ms(value);
+  return typeof parsed === "number" ? parsed : fallback;
 }
 
-export const config: AppConfig = {
+function parseCsv(value: string | undefined): string[] {
+  return value ? value.split(",").map((s) => s.trim()).filter(Boolean) : [];
+}
+
+export const config = {
   nodeEnv: process.env.NODE_ENV || "development",
-  isProduction: process.env.NODE_ENV === "production",
   port: parseNumber(process.env.PORT, 5000),
 
+  // Auth / Sessions
   sessionSecret: process.env.SESSION_SECRET,
-  stripeSecretKey: process.env.STRIPE_SECRET_KEY || process.env.STRIPE_TEST_API_KEY, // prefer STRIPE_SECRET_KEY
-  stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
+  replitDomains: parseCsv(process.env.REPLIT_DOMAINS),
+  replId: process.env.REPL_ID,
+  issuerUrl: process.env.ISSUER_URL || "https://replit.com/oidc",
 
+  // Database
   databaseUrl: process.env.DATABASE_URL,
 
-  allowedOrigins: parseCsv(process.env.ALLOWED_ORIGINS),
-};
+  // Blockchain / Token
+  solanaRpcUrl:
+    process.env.SOLANA_RPC_URL || "https://solana-mainnet.g.alchemy.com/v2/demo",
+  chonkMintAddress:
+    process.env.CHONK9K_MINT_ADDRESS ||
+    "DnUsQnwNot38V9JbisNC18VHZkae1eKK5N2Dgy55pump",
+  whaleThreshold: parseNumber(process.env.WHALE_THRESHOLD, 100000),
 
-export function validateEnv() {
-  const errs: string[] = [];
-  if (!config.sessionSecret) errs.push("SESSION_SECRET is required.");
-  // Stripe is optional unless using checkout/webhooks:
-  // If you plan to use Stripe, uncomment:
-  // if (!config.stripeSecretKey) errs.push("STRIPE_SECRET_KEY is required for Stripe Checkout.");
-  // if (!config.stripeWebhookSecret) errs.push("STRIPE_WEBHOOK_SECRET is required for Stripe webhooks.");
+  // API Protection
+  rateLimitWindowMs: parseMs(process.env.RATE_LIMIT_WINDOW_MS, ms("5m")),
+  rateLimitMax: parseNumber(process.env.RATE_LIMIT_MAX, 600),
 
-  if (errs.length > 0) {
-    const err = new Error(`Invalid environment: ${errs.join(" ")}`);
-    (err as any).status = 500;
-    throw err;
-  }
-}
-
-export function printSafeConfig() {
-  return {
-    nodeEnv: config.nodeEnv,
-    isProduction: config.isProduction,
-    port: config.port,
-    hasSessionSecret: !!config.sessionSecret,
-    hasStripeSecretKey: !!config.stripeSecretKey,
-    hasStripeWebhookSecret: !!config.stripeWebhookSecret,
-    hasDatabaseUrl: !!config.databaseUrl,
-    allowedOrigins: config.allowedOrigins,
-  };
-}
+  // CORS
+  corsAllowedOrigins: parseCsv(process.env.ALLOWED_ORIGINS),
+} as const;

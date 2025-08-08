@@ -1,17 +1,15 @@
-/**
- * Neon SQL client, optional. Uses DATABASE_URL if present.
- * Guidance: use @neondatabase/serverless and neon(DATABASE_URL) to create a reusable SQL client [^vercel_knowledge_base].
- */
-import { neon } from "@neondatabase/serverless";
+import { Pool, neonConfig } from '@neondatabase/serverless';
+import { drizzle } from 'drizzle-orm/neon-serverless';
+import ws from "ws";
+import * as schema from "@shared/schema";
 
-export const sql = process.env.DATABASE_URL ? neon(process.env.DATABASE_URL) : null;
+neonConfig.webSocketConstructor = ws;
 
-export async function pingDb(): Promise<{ ok: boolean; error?: string }> {
-  if (!sql) return { ok: false, error: "not-configured" };
-  try {
-    await sql`SELECT 1 as ok`;
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, error: (e as Error).message };
-  }
+if (!process.env.DATABASE_URL) {
+  throw new Error(
+    "DATABASE_URL must be set. Did you forget to provision a database?",
+  );
 }
+
+export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+export const db = drizzle({ client: pool, schema });
