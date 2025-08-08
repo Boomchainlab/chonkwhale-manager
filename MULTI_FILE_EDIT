@@ -1,0 +1,136 @@
+// server/index.ts
+import express from "express";
+import { createServer, type Server } from "http";
+import WebSocket, { WebSocketServer } from "ws";
+import { storage } from "./storage";
+import { setupAuth, isAuthenticated } from "./replitAuth";
+import { WhaleTracker } from "./services/whaleTracker";
+import { AlertService } from "./services/alertService";
+import { insertAlertSchema } from "@shared/schema";
+import { z } from "zod";
+import { pool } from "./db";
+
+const app = express();
+const server = createServer(app);
+const wss = new WebSocketServer({ server });
+
+// Skip JSON parsing for the Stripe webhook path; it needs the raw body.
+app.use((req, res, next) => {
+  if (req.path === "/api/stripe/webhook") return next();
+  return express.json()(req, res, next);
+});
+app.use(express.urlencoded({ extended: false }));
+
+// Stripe webhook must use raw body for signature verification.
+app.post(
+  "/api/stripe/webhook",
+  express.raw({ type: "application/json" }),
+  (req, res) => {
+    const stripeSecret =
+      process.env.STRIPE_SECRET_KEY ||
+      process.env.STRIPE_TEST_API_KEY ||
+      undefined;
+    const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    const stripe = stripeSecret ? new Stripe(stripeSecret, { apiVersion: "2024-06-20" }) : null;
+
+    if (!stripe || !stripeWebhookSecret) {
+      return res.status(503).send("Stripe webhook not configured");
+    }
+
+    const sig = req.headers["stripe-signature"] as string | undefined;
+    if (!sig) return res.status(400).send("Missing Stripe-Signature header");
+
+    try {
+      const event = stripe.webhooks.constructEvent(
+        req.body,
+        sig,
+        stripeWebhookSecret
+      );
+      // TODO: handle events: checkout.session.completed, invoice.paid, etc.
+      // console.log("Stripe event:", event.type);
+      res.json({ received: true });
+    } catch (err: any) {
+      console.error("Stripe webhook error:", err.message);
+      res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+  }
+);
+
+// Stripe Checkout session route
+app.post("/api/stripe/checkout", async (req, res) => {
+  const stripeSecret =
+    process.env.STRIPE_SECRET_KEY ||
+    process.env.STRIPE_TEST_API_KEY ||
+    undefined;
+  const stripe = stripeSecret ? new Stripe(stripeSecret, { apiVersion: "2024-06-20" }) : null;
+
+  if (!stripe) {
+    return res.status(503).json({ message: "Stripe not configured" });
+  }
+  try {
+    const {
+      priceId,
+      quantity = 1,
+      successUrl,
+      cancelUrl,
+      mode = "subscription",
+      lineItems
+    } = (req.body ?? {}) as {
+      priceId?: string;
+      quantity?: number;
+      successUrl?: string;
+      cancelUrl?: string;
+      mode?: "payment" | "subscription";
+      lineItems?: Array<{ price: string; quantity?: number }>;
+    };
+
+    if (!lineItems && !priceId) {
+      return res.status(400).json({ message: "priceId or lineItems required" });
+    }
+
+    const session = await stripe.checkout.sessions.create({
+      mode,
+      success_url: successUrl || `${req.protocol}://${req.get("host")}/?success=true`,
+      cancel_url: cancelUrl || `${req.protocol}://${req.get("host")}/?canceled=true`,
+      line_items: lineItems ?? [{ price: priceId!, quantity }],
+      allow_promotion_codes: true,
+    });
+
+    res.json({ id: session.id, url: session.url });
+  } catch (error) {
+    console.error("Stripe checkout error:", error);
+    res.status(500).json({ message: "Failed to create checkout session" });
+  }
+});
+
+// Neon SQL health-check route for readiness
+app.get("/api/ready", async (_req, res) => {
+  try {
+    await pool.query("select 1");
+    res.json({
+      status: "ready",
+      timestamp: new Date().toISOString(),
+    });
+  } catch (e) {
+    res.status(503).json({ status: "not-ready" });
+  }
+});
+
+// /** rest of code here **/
+
+// vite.config.ts
+import { defineConfig, loadEnv } from "vite";
+
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), "");
+  return {
+    // keep your existing plugins, server, build options, etc.
+    // plugins: [react(), ...],
+    define: {
+      // Preserve existing define if present by spreading it:
+      ...(typeof (globalThis as any).__EXISTING_DEFINE__ === "object" ? (globalThis as any).__EXISTING_DEFINE__ : {}),
+      // Replace any usage of import.meta.env.VITE_TEST_API_KEY with the publishable key.
+      "import.meta.env.VITE_TEST_API_KEY": JSON.stringify(env.VITE_PUBLISHABLE_KEY ?? ""),
+    },
+  };
+});

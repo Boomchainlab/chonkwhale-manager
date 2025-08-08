@@ -1,0 +1,629 @@
+#!/bin/bash
+
+# deploy.sh - Complete deployment script for $CHONK9K Whale Manager
+
+# Usage: ./deploy.sh [production|staging|development]
+
+set -e
+
+# Colors for output
+
+RED=’\033[0;31m’
+GREEN=’\033[0;32m’
+YELLOW=’\033[1;33m’
+BLUE=’\033[0;34m’
+NC=’\033[0m’ # No Color
+
+# Configuration
+
+PROJECT_NAME=“chonk9k-whale-manager”
+DOCKER_IMAGE=“boomchainlab/$PROJECT_NAME”
+GITHUB_REPO=“Boomchainlab/chonk9k-whale-manager-deployment”
+
+# Environment (default to production)
+
+ENVIRONMENT=${1:-production}
+ENV_FILE=”.env.$ENVIRONMENT”
+
+# Functions
+
+log_info() {
+echo -e “${BLUE}[INFO]${NC} $1”
+}
+
+log_success() {
+echo -e “${GREEN}[SUCCESS]${NC} $1”
+}
+
+log_warn() {
+echo -e “${YELLOW}[WARN]${NC} $1”
+}
+
+log_error() {
+echo -e “${RED}[ERROR]${NC} $1”
+}
+
+check_dependencies() {
+log_info “Checking dependencies…”
+
+\`\`\`
+command -v node >/dev/null 2>&1 || { log_error "Node.js is required but not installed."; exit 1; }
+command -v npm >/dev/null 2>&1 || { log_error "npm is required but not installed."; exit 1; }
+command -v docker >/dev/null 2>&1 || { log_error "Docker is required but not installed."; exit 1; }
+
+log_success "All dependencies found"
+\`\`\`
+
+}
+
+setup_environment() {
+log_info “Setting up $ENVIRONMENT environment…”
+
+\`\`\`
+if [[ ! -f "$ENV_FILE" ]]; then
+    log_warn "Environment file $ENV_FILE not found. Creating from template..."
+    
+    cat > "$ENV_FILE" << EOF
+\`\`\`
+
+# $CHONK9K Whale Manager - $ENVIRONMENT Configuration
+
+NODE_ENV=$ENVIRONMENT
+PORT=3000
+
+# Solana Configuration
+
+RPC_URL=https://api.mainnet-beta.solana.com
+MINT_ADDRESS=DnUsQnwNot38V9JbisNC18VHZkae1eKK5N2Dgy55pump
+WHALE_THRESHOLD=100000
+SCAN_INTERVAL_MS=300000
+
+# Monitoring
+
+ENABLE_REALTIME=true
+ENABLE_PRICE_TRACKING=true
+ENABLE_METRICS=true
+
+# Alerts
+
+ALERT_NEW_WHALE=true
+ALERT_WHALE_EXIT=true
+ALERT_LARGE_TRANSFER=true
+ALERT_PRICE_IMPACT=true
+
+# Discord Integration (REPLACE WITH YOUR WEBHOOK)
+
+WEBHOOK_URL=https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_WEBHOOK_TOKEN
+
+# Optional: Slack, Telegram, Email
+
+# SLACK_WEBHOOK=https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK
+
+# TELEGRAM_BOT_TOKEN=YOUR_TELEGRAM_BOT_TOKEN
+
+# TELEGRAM_CHAT_ID=YOUR_TELEGRAM_CHAT_ID
+
+# Database (Optional)
+
+# DATABASE_URL=mongodb://localhost:27017/chonk9k-whales
+
+# Security
+
+JWT_SECRET=$(openssl rand -base64 32)
+BCRYPT_ROUNDS=12
+
+# Rate Limiting
+
+API_RATE_LIMIT=100
+
+# Logging
+
+LOG_LEVEL=info
+EOF
+
+\`\`\`
+    log_warn "Please edit $ENV_FILE with your actual configuration before continuing."
+    log_warn "Especially update the WEBHOOK_URL with your Discord webhook."
+    read -p "Press Enter to continue after editing the file..."
+fi
+
+source "$ENV_FILE"
+log_success "Environment configured for $ENVIRONMENT"
+\`\`\`
+
+}
+
+install_dependencies() {
+log_info “Installing Node.js dependencies…”
+npm ci –only=production
+log_success “Dependencies installed”
+}
+
+build_application() {
+log_info “Building application…”
+npm run build
+log_success “Application built successfully”
+}
+
+build_docker_image() {
+log_info “Building Docker image…”
+
+\`\`\`
+# Get version from package.json
+VERSION=$(node -p "require('./package.json').version")
+
+docker build \
+    --build-arg NODE_ENV=$ENVIRONMENT \
+    -t $DOCKER_IMAGE:latest \
+    -t $DOCKER_IMAGE:v$VERSION \
+    -t $DOCKER_IMAGE:$ENVIRONMENT \
+    .
+
+log_success "Docker image built: $DOCKER_IMAGE:latest"
+\`\`\`
+
+}
+
+deploy_with_docker() {
+log_info “Deploying with Docker…”
+
+\`\`\`
+# Stop existing container if running
+if docker ps -a --format "table {{.Names}}" | grep -q "^$PROJECT_NAME\$"; then
+    log_info "Stopping existing container..."
+    docker stop $PROJECT_NAME || true
+    docker rm $PROJECT_NAME || true
+fi
+
+# Run new container
+docker run -d \
+    --name $PROJECT_NAME \
+    --restart unless-stopped \
+    -p 3000:3000 \
+    --env-file "$ENV_FILE" \
+    -v "$(pwd)/data:/app/data" \
+    -v "$(pwd)/logs:/app/logs" \
+    $DOCKER_IMAGE:latest
+
+log_success "Container deployed and running"
+
+# Wait for health check
+log_info "Waiting for application to be healthy..."
+sleep 10
+
+if curl -f http://localhost:3000/api/v1/health > /dev/null 2>&1; then
+    log_success "Application is healthy and responding"
+else
+    log_error "Application health check failed"
+    docker logs $PROJECT_NAME --tail 50
+    exit 1
+fi
+\`\`\`
+
+}
+
+deploy_with_pm2() {
+log_info “Deploying with PM2…”
+
+\`\`\`
+# Install PM2 if not present
+if ! command -v pm2 >/dev/null 2>&1; then
+    log_info "Installing PM2..."
+    npm install -g pm2
+fi
+
+# Create PM2 ecosystem file
+cat > ecosystem.config.js << EOF
+\`\`\`
+
+module.exports = {
+apps: [{
+name: ‘$PROJECT_NAME’,
+script: ‘dist/index.js’,
+instances: ‘max’,
+exec_mode: ‘cluster’,
+env_file: ‘$ENV_FILE’,
+max_memory_restart: ‘512M’,
+log_file: ‘./logs/combined.log’,
+out_file: ‘./logs/out.log’,
+error_file: ‘./logs/error.log’,
+log_date_format: ‘YYYY-MM-DD HH:mm:ss Z’,
+merge_logs: true,
+autorestart: true,
+watch: false,
+max_restarts: 10,
+min_uptime: ‘10s’
+}]
+};
+EOF
+
+\`\`\`
+# Create logs directory
+mkdir -p logs
+
+# Stop existing process
+pm2 stop $PROJECT_NAME 2>/dev/null || true
+pm2 delete $PROJECT_NAME 2>/dev/null || true
+
+# Start new process
+pm2 start ecosystem.config.js
+pm2 save
+
+log_success "Application deployed with PM2"
+\`\`\`
+
+}
+
+setup_nginx() {
+if [[ “$ENVIRONMENT” != “production” ]]; then
+return
+fi
+
+\`\`\`
+log_info "Setting up Nginx reverse proxy..."
+
+# Create Nginx config
+sudo tee /etc/nginx/sites-available/$PROJECT_NAME << EOF
+\`\`\`
+
+server {
+listen 80;
+server_name whale.yourdomain.com;  # Replace with your domain
+
+\`\`\`
+# Security headers
+add_header X-Frame-Options DENY;
+add_header X-Content-Type-Options nosniff;
+add_header X-XSS-Protection "1; mode=block";
+
+# Rate limiting
+limit_req_zone \$binary_remote_addr zone=api:10m rate=10r/s;
+
+location / {
+    proxy_pass http://localhost:3000;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade \$http_upgrade;
+    proxy_set_header Connection 'upgrade';
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_cache_bypass \$http_upgrade;
+}
+
+location /api/ {
+    limit_req zone=api burst=20 nodelay;
+    proxy_pass http://localhost:3000;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+}
+\`\`\`
+
+}
+EOF
+
+\`\`\`
+# Enable site
+sudo ln -sf /etc/nginx/sites-available/$PROJECT_NAME /etc/nginx/sites-enabled/
+
+# Test and reload Nginx
+sudo nginx -t && sudo systemctl reload nginx
+
+log_success "Nginx configured"
+\`\`\`
+
+}
+
+setup_ssl() {
+if [[ “$ENVIRONMENT” != “production” ]]; then
+return
+fi
+
+\`\`\`
+log_info "Setting up SSL with Let's Encrypt..."
+
+# Install certbot if not present
+if ! command -v certbot >/dev/null 2>&1; then
+    sudo apt update
+    sudo apt install -y certbot python3-certbot-nginx
+fi
+
+# Get SSL certificate
+sudo certbot --nginx -d whale.yourdomain.com  # Replace with your domain
+
+log_success "SSL certificate installed"
+\`\`\`
+
+}
+
+setup_monitoring() {
+log_info “Setting up monitoring…”
+
+\`\`\`
+# Create monitoring script
+cat > monitor.sh << 'EOF'
+\`\`\`
+
+#!/bin/bash
+
+# Simple monitoring script for $CHONK9K Whale Manager
+
+LOG_FILE=”./logs/monitor.log”
+WEBHOOK_URL=”${DISCORD_WEBHOOK:-$WEBHOOK_URL}”
+
+check_health() {
+if curl -f http://localhost:3000/api/v1/health > /dev/null 2>&1; then
+return 0
+else
+return 1
+fi
+}
+
+send_alert() {
+local message=”$1”
+
+\`\`\`
+if [[ -n "$WEBHOOK_URL" ]]; then
+    curl -X POST "$WEBHOOK_URL" \
+        -H "Content-Type: application/json" \
+        -d "{\"content\":\"🚨 **$CHONK9K Whale Manager Alert**\n$message\"}"
+fi
+
+echo "$(date): $message" >> "$LOG_FILE"
+\`\`\`
+
+}
+
+# Main monitoring loop
+
+if ! check_health; then
+send_alert “Application health check failed! Service may be down.”
+
+\`\`\`
+# Try to restart
+if command -v pm2 >/dev/null 2>&1; then
+    pm2 restart chonk9k-whale-manager
+elif command -v docker >/dev/null 2>&1; then
+    docker restart chonk9k-whale-manager
+fi
+
+sleep 30
+
+if check_health; then
+    send_alert "Application restarted successfully."
+else
+    send_alert "Failed to restart application. Manual intervention required."
+fi
+\`\`\`
+
+fi
+EOF
+
+\`\`\`
+chmod +x monitor.sh
+
+# Add to crontab for regular health checks
+(crontab -l 2>/dev/null; echo "*/5 * * * * $(pwd)/monitor.sh") | crontab -
+
+log_success "Monitoring configured"
+\`\`\`
+
+}
+
+create_startup_service() {
+if [[ “$ENVIRONMENT” != “production” ]]; then
+return
+fi
+
+\`\`\`
+log_info "Creating systemd service..."
+
+sudo tee /etc/systemd/system/$PROJECT_NAME.service << EOF
+\`\`\`
+
+[Unit]
+Description=$CHONK9K Whale Manager
+After=network.target
+
+[Service]
+Type=forking
+User=$(whoami)
+WorkingDirectory=$(pwd)
+ExecStart=/usr/local/bin/pm2 start ecosystem.config.js
+ExecReload=/usr/local/bin/pm2 restart $PROJECT_NAME
+ExecStop=/usr/local/bin/pm2 stop $PROJECT_NAME
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+\`\`\`
+sudo systemctl daemon-reload
+sudo systemctl enable $PROJECT_NAME
+
+log_success "Systemd service created and enabled"
+\`\`\`
+
+}
+
+run_tests() {
+if [[ -f “package.json” ]] && npm run test –if-present > /dev/null 2>&1; then
+log_info “Running tests…”
+npm test
+log_success “All tests passed”
+else
+log_warn “No tests found or test script not available”
+fi
+}
+
+backup_database() {
+log_info “Creating database backup…”
+
+\`\`\`
+mkdir -p backups
+
+if [[ -f "data/whales.json" ]]; then
+    cp data/whales.json "backups/whales-$(date +%Y%m%d_%H%M%S).json"
+    log_success "Database backup created"
+else
+    log_warn "No database file found to backup"
+fi
+\`\`\`
+
+}
+
+show_status() {
+log_info “Application Status:”
+
+\`\`\`
+if command -v docker >/dev/null 2>&1 && docker ps --format "table {{.Names}}\t{{.Status}}" | grep -q "$PROJECT_NAME"; then
+    echo "Docker Container:"
+    docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" | grep "$PROJECT_NAME"
+fi
+
+if command -v pm2 >/dev/null 2>&1; then
+    echo "PM2 Process:"
+    pm2 status $PROJECT_NAME 2>/dev/null || echo "PM2 process not found"
+fi
+
+if systemctl is-active --quiet $PROJECT_NAME 2>/dev/null; then
+    echo "Service Status: Active"
+fi
+
+echo ""
+echo "Health Check:"
+if curl -f http://localhost:3000/api/v1/health > /dev/null 2>&1; then
+    echo "✅ Application is healthy"
+    echo "🌐 Dashboard: http://localhost:3000"
+    echo "📚 API Docs: http://localhost:3000/docs"
+else
+    echo "❌ Application health check failed"
+fi
+\`\`\`
+
+}
+
+deploy_to_vps() {
+log_info “Deploying to VPS…”
+
+\`\`\`
+# This would typically use rsync, scp, or Git
+# For now, we'll show the manual steps
+
+cat << EOF
+\`\`\`
+
+To deploy to a VPS:
+
+1. Copy your project to the VPS:
+   rsync -avz –exclude node_modules –exclude .git . user@your-vps:/path/to/app/
+1. SSH into your VPS:
+   ssh user@your-vps
+1. Navigate to the app directory and run:
+   cd /path/to/app
+   ./deploy.sh production
+1. Configure your domain DNS to point to the VPS IP
+1. Update the Nginx config with your actual domain
+
+EOF
+}
+
+print_success_message() {
+cat << EOF
+
+🎉 $CHONK9K Whale Manager Deployment Complete!
+
+📊 Dashboard: http://localhost:3000
+📚 API Documentation: http://localhost:3000/docs
+🔗 WebSocket: ws://localhost:3000
+
+🚀 Your whale manager is now monitoring CHONK9K token:
+• Token: DnUsQnwNot38V9JbisNC18VHZkae1eKK5N2Dgy55pump
+• Threshold: $WHALE_THRESHOLD tokens
+• Real-time alerts: ${ALERT_NEW_WHALE:-true}
+
+💰 Start monetizing:
+
+1. Share your dashboard with the CHONK9K community
+1. Set up premium subscriptions
+1. Offer custom whale tracking services
+1. Create white-label solutions for other tokens
+
+📈 Next steps:
+• Add more Solana tokens
+• Implement payment processing
+• Scale with additional server resources
+• Build mobile app integration
+
+Happy whale hunting! 🐋
+
+EOF
+}
+
+# Main deployment flow
+
+main() {
+log_info “🚀 Starting $CHONK9K Whale Manager deployment…”
+log_info “Environment: $ENVIRONMENT”
+
+\`\`\`
+check_dependencies
+setup_environment
+
+# Backup existing data
+backup_database
+
+# Build and deploy
+install_dependencies
+build_application
+
+# Choose deployment method
+if [[ "$2" == "docker" ]] || command -v docker >/dev/null 2>&1; then
+    build_docker_image
+    deploy_with_docker
+else
+    deploy_with_pm2
+fi
+
+# Production-specific setup
+if [[ "$ENVIRONMENT" == "production" ]]; then
+    setup_nginx
+    setup_ssl
+    create_startup_service
+    setup_monitoring
+fi
+
+# Show status
+sleep 5
+show_status
+
+print_success_message
+
+log_success "Deployment completed successfully! 🎉"
+\`\`\`
+
+}
+
+# Handle script arguments
+
+case “${1:-deploy}” in
+“test”)
+run_tests
+;;
+“status”)
+show_status
+;;
+“backup”)
+backup_database
+;;
+“vps”)
+deploy_to_vps
+;;
+*)
+main “$@”
+;;
+esac
