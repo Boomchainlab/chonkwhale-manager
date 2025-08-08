@@ -46,6 +46,11 @@ const generateMockWhales = (): TopWhale[] => {
   }).sort((a, b) => b.balance - a.balance)
 }
 
+/**
+ * Handles GET requests to retrieve mock data for top cryptocurrency whale wallets.
+ *
+ * Returns a JSON response containing an array of whale wallet objects, the total count, and a timestamp. On error, returns a failure response with status 500.
+ */
 export async function GET(request: NextRequest) {
   try {
     const whales = generateMockWhales()

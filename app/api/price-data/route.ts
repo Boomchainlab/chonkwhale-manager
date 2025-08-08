@@ -49,6 +49,11 @@ const generatePriceHistory = (hours: number = 24): PriceData[] => {
   return data
 }
 
+/**
+ * Handles GET requests to generate and return simulated cryptocurrency price data and statistics for a specified timeframe.
+ *
+ * Parses the `timeframe` query parameter to determine the historical range, generates mock price data, computes summary statistics, and returns the results as a JSON response. On error, returns a JSON response with an error message and a 500 status code.
+ */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)

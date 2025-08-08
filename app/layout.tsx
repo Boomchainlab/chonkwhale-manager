@@ -20,6 +20,13 @@ export const metadata: Metadata = {
     generator: 'v0.dev'
 }
 
+/**
+ * Root layout component that sets up global providers, theming, and notification UI for the application.
+ *
+ * Wraps all page content with theme and wallet context providers, applies the Inter font, and includes a notification toaster.
+ *
+ * @param children - The content to be rendered within the layout
+ */
 export default function RootLayout({
   children,
 }: {

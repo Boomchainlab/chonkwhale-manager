@@ -6,6 +6,11 @@ import { Badge } from '@/components/ui/badge'
 import { Wallet, Copy, ExternalLink } from 'lucide-react'
 import { useState } from 'react'
 
+/**
+ * Renders a wallet connection button with UI for connecting, managing, and interacting with a user's wallet.
+ *
+ * Displays the connected wallet's network, a truncated address with copy and external link actions, and a manage button when connected. Shows a "Connect Wallet" button when not connected. Provides visual feedback when the address is copied to the clipboard.
+ */
 export function WalletConnectButton() {
   const { open } = useAppKit()
   const { address, isConnected } = useAppKitAccount()

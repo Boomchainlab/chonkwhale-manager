@@ -17,6 +17,11 @@ interface WhaleData {
   label?: string
 }
 
+/**
+ * Displays a ranked list of the top CHONK token holders ("whales") with their balances, wallet addresses, 24-hour changes, and transaction counts.
+ *
+ * Fetches and periodically refreshes mock whale data, showing a loading state while data is being retrieved. Each whale entry includes rank, avatar, formatted wallet address, optional label, token and USD balances, transaction count, 24-hour percentage change with visual indicators, and a button linking to the wallet's Solscan page.
+ */
 export function TopWhales() {
   const [whales, setWhales] = useState<WhaleData[]>([])
   const [isLoading, setIsLoading] = useState(true)

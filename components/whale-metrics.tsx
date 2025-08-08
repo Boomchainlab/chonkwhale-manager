@@ -13,6 +13,11 @@ interface MetricData {
   description: string
 }
 
+/**
+ * Displays a grid of whale-related financial metrics as interactive cards.
+ *
+ * Shows loading skeletons while fetching data, then renders cards for each metric with icons, values, change indicators, and descriptions. Metrics are refreshed every 60 seconds with simulated data.
+ */
 export function WhaleMetrics() {
   const [metrics, setMetrics] = useState<MetricData[]>([])
   const [isLoading, setIsLoading] = useState(true)

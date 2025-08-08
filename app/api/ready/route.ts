@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+/**
+ * Handles GET requests to the readiness endpoint, returning the operational status of key system components.
+ *
+ * Performs synchronous checks for the presence of required environment variables for the API, database, wallet integration, payment processing, and session management. Responds with a JSON object summarizing the readiness of each component, the overall readiness state, and a timestamp. Returns HTTP 200 if all checks pass, otherwise 503. On error, returns a failure response with HTTP 503.
+ */
 export async function GET(request: NextRequest) {
   try {
     // Check various system components

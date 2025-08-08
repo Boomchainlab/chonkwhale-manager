@@ -35,6 +35,11 @@ let alerts: Alert[] = [
   }
 ]
 
+/**
+ * Handles GET requests to retrieve the current list of alerts.
+ *
+ * Returns a JSON response containing a success flag, the array of alert objects, and the total count of alerts.
+ */
 export async function GET(request: NextRequest) {
   try {
     return NextResponse.json({
@@ -51,6 +56,11 @@ export async function GET(request: NextRequest) {
   }
 }
 
+/**
+ * Handles POST requests to create a new alert object.
+ *
+ * Parses the request body for required fields, validates input, and adds a new alert to in-memory storage. Returns a JSON response with the created alert on success, or an error message with appropriate status code on failure.
+ */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
