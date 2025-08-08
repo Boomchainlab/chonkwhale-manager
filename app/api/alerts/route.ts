@@ -1,32 +1,80 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-// Mock alerts storage - in production, use your database
-let mockAlerts = [
+interface Alert {
+  id: string
+  name: string
+  type: 'volume' | 'price' | 'whale_activity' | 'transaction_size'
+  condition: 'above' | 'below' | 'equals'
+  threshold: number
+  isActive: boolean
+  triggeredCount: number
+  lastTriggered?: string
+  createdAt: string
+  updatedAt: string
+}
+
+// Mock alerts storage (in production, this would be in your database)
+let mockAlerts: Alert[] = [
   {
     id: '1',
-    name: 'Large Buy Alert',
-    condition: 'transaction_above',
-    threshold: 100000,
+    name: 'Large Volume Alert',
+    type: 'volume',
+    condition: 'above',
+    threshold: 1000000,
     isActive: true,
-    triggered: false,
-    lastTriggered: undefined
+    triggeredCount: 3,
+    lastTriggered: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+    updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
   },
   {
     id: '2',
-    name: 'High Volume Alert',
-    condition: 'volume_above',
-    threshold: 500000,
+    name: 'Price Drop Alert',
+    type: 'price',
+    condition: 'below',
+    threshold: 0.05,
     isActive: true,
-    triggered: true,
-    lastTriggered: new Date(Date.now() - 3600000).toISOString() // 1 hour ago
+    triggeredCount: 0,
+    createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+    updatedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: '3',
+    name: 'Whale Activity Spike',
+    type: 'whale_activity',
+    condition: 'above',
+    threshold: 50,
+    isActive: false,
+    triggeredCount: 12,
+    lastTriggered: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+    createdAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
+    updatedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
   }
 ]
 
 export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url)
+    const isActive = searchParams.get('active')
+    const type = searchParams.get('type')
+
+    let filteredAlerts = mockAlerts
+
+    // Filter by active status
+    if (isActive !== null) {
+      const activeFilter = isActive === 'true'
+      filteredAlerts = filteredAlerts.filter(alert => alert.isActive === activeFilter)
+    }
+
+    // Filter by type
+    if (type && ['volume', 'price', 'whale_activity', 'transaction_size'].includes(type)) {
+      filteredAlerts = filteredAlerts.filter(alert => alert.type === type)
+    }
+
     return NextResponse.json({
       success: true,
-      alerts: mockAlerts
+      data: filteredAlerts,
+      total: filteredAlerts.length
     })
   } catch (error) {
     console.error('Error fetching alerts:', error)
@@ -40,24 +88,51 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { name, condition, threshold } = body
+    const { name, type, condition, threshold } = body
 
-    const newAlert = {
+    // Validate required fields
+    if (!name || !type || !condition || threshold === undefined) {
+      return NextResponse.json(
+        { success: false, error: 'Missing required fields' },
+        { status: 400 }
+      )
+    }
+
+    // Validate type
+    if (!['volume', 'price', 'whale_activity', 'transaction_size'].includes(type)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid alert type' },
+        { status: 400 }
+      )
+    }
+
+    // Validate condition
+    if (!['above', 'below', 'equals'].includes(condition)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid condition' },
+        { status: 400 }
+      )
+    }
+
+    // Create new alert
+    const newAlert: Alert = {
       id: Date.now().toString(),
       name,
+      type,
       condition,
-      threshold: Number(threshold),
+      threshold: parseFloat(threshold),
       isActive: true,
-      triggered: false,
-      lastTriggered: undefined
+      triggeredCount: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     }
 
     mockAlerts.push(newAlert)
 
     return NextResponse.json({
       success: true,
-      alert: newAlert
-    })
+      data: newAlert
+    }, { status: 201 })
   } catch (error) {
     console.error('Error creating alert:', error)
     return NextResponse.json(

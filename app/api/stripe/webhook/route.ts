@@ -1,197 +1,90 @@
+import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
-import { NextResponse } from "next/server"
-import { neon } from "@neondatabase/serverless"
 
-const sql = process.env.DATABASE_URL ? neon(process.env.DATABASE_URL) : null
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: '2024-06-20'
+})
 
-function getStripe(): Stripe | null {
-  const secret = process.env.STRIPE_SECRET_KEY || process.env.STRIPE_TEST_API_KEY
-  if (!secret) return null
-  return new Stripe(secret, { apiVersion: "2024-06-20" as any })
-}
+const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!
 
-export const dynamic = 'force-dynamic'
-
-export async function POST(request: Request) {
-  const stripe = getStripe()
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
-  
-  if (!stripe || !webhookSecret) {
-    console.error("Stripe webhook misconfigured:", {
-      hasStripe: !!stripe,
-      hasWebhookSecret: !!webhookSecret,
-    })
-    return new NextResponse("Webhook misconfigured", { status: 400 })
-  }
-
-  const sig = request.headers.get("stripe-signature")
-  if (!sig) {
-    console.error("Missing stripe-signature header")
-    return new NextResponse("Missing stripe-signature header", { status: 400 })
-  }
-
+export async function POST(request: NextRequest) {
   try {
-    const rawBody = await request.text()
-    const event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret)
+    const body = await request.text()
+    const signature = request.headers.get('stripe-signature')!
 
-    console.log(`🔔 Stripe webhook received: ${event.type}`)
+    let event: Stripe.Event
 
+    try {
+      event = stripe.webhooks.constructEvent(body, signature, webhookSecret)
+    } catch (err) {
+      console.error('Webhook signature verification failed:', err)
+      return NextResponse.json(
+        { success: false, error: 'Invalid signature' },
+        { status: 400 }
+      )
+    }
+
+    // Handle the event
     switch (event.type) {
-      case "checkout.session.completed": {
+      case 'checkout.session.completed':
         const session = event.data.object as Stripe.Checkout.Session
-        console.log("✅ Checkout completed:", {
-          id: session.id,
-          customer: session.customer,
-          mode: session.mode,
-          amount_total: session.amount_total,
-          plan: session.metadata?.plan
-        })
+        console.log('Checkout session completed:', session.id)
         
-        // Create user account and grant access
-        if (sql && session.customer) {
-          try {
-            await sql`
-              INSERT INTO users (stripe_customer_id, email, plan, status, created_at)
-              VALUES (
-                ${session.customer as string}, 
-                ${session.customer_details?.email || ''}, 
-                ${session.metadata?.plan || 'pro'}, 
-                'active', 
-                NOW()
-              )
-              ON CONFLICT (stripe_customer_id) 
-              DO UPDATE SET 
-                plan = ${session.metadata?.plan || 'pro'},
-                status = 'active',
-                updated_at = NOW()
-            `
-          } catch (dbError) {
-            console.error("Database error:", dbError)
-          }
-        }
+        // Here you would typically:
+        // 1. Update user subscription in database
+        // 2. Send confirmation email
+        // 3. Grant access to premium features
+        
         break
-      }
 
-      case "customer.subscription.created": {
+      case 'customer.subscription.created':
         const subscription = event.data.object as Stripe.Subscription
-        console.log("🆕 Subscription created:", {
-          id: subscription.id,
-          customer: subscription.customer,
-          status: subscription.status,
-        })
+        console.log('Subscription created:', subscription.id)
         
-        if (sql) {
-          try {
-            await sql`
-              UPDATE users 
-              SET 
-                subscription_id = ${subscription.id},
-                status = ${subscription.status},
-                updated_at = NOW()
-              WHERE stripe_customer_id = ${subscription.customer as string}
-            `
-          } catch (dbError) {
-            console.error("Database error:", dbError)
-          }
-        }
+        // Handle new subscription
         break
-      }
 
-      case "customer.subscription.updated": {
-        const subscription = event.data.object as Stripe.Subscription
-        console.log("🔄 Subscription updated:", {
-          id: subscription.id,
-          customer: subscription.customer,
-          status: subscription.status,
-        })
+      case 'customer.subscription.updated':
+        const updatedSubscription = event.data.object as Stripe.Subscription
+        console.log('Subscription updated:', updatedSubscription.id)
         
-        if (sql) {
-          try {
-            await sql`
-              UPDATE users 
-              SET 
-                status = ${subscription.status},
-                updated_at = NOW()
-              WHERE subscription_id = ${subscription.id}
-            `
-          } catch (dbError) {
-            console.error("Database error:", dbError)
-          }
-        }
+        // Handle subscription changes
         break
-      }
 
-      case "customer.subscription.deleted": {
-        const subscription = event.data.object as Stripe.Subscription
-        console.log("❌ Subscription cancelled:", {
-          id: subscription.id,
-          customer: subscription.customer,
-        })
+      case 'customer.subscription.deleted':
+        const deletedSubscription = event.data.object as Stripe.Subscription
+        console.log('Subscription cancelled:', deletedSubscription.id)
         
-        if (sql) {
-          try {
-            await sql`
-              UPDATE users 
-              SET 
-                status = 'cancelled',
-                updated_at = NOW()
-              WHERE subscription_id = ${subscription.id}
-            `
-          } catch (dbError) {
-            console.error("Database error:", dbError)
-          }
-        }
+        // Handle subscription cancellation
         break
-      }
 
-      case "invoice.payment_succeeded": {
+      case 'invoice.payment_succeeded':
         const invoice = event.data.object as Stripe.Invoice
-        console.log("💰 Payment succeeded:", {
-          id: invoice.id,
-          customer: invoice.customer,
-          amount_paid: invoice.amount_paid,
-        })
-        break
-      }
-
-      case "invoice.payment_failed": {
-        const invoice = event.data.object as Stripe.Invoice
-        console.log("💸 Payment failed:", {
-          id: invoice.id,
-          customer: invoice.customer,
-          amount_due: invoice.amount_due,
-        })
+        console.log('Payment succeeded:', invoice.id)
         
-        // Handle failed payment - maybe send notification
-        if (sql && invoice.customer) {
-          try {
-            await sql`
-              UPDATE users 
-              SET 
-                status = 'past_due',
-                updated_at = NOW()
-              WHERE stripe_customer_id = ${invoice.customer as string}
-            `
-          } catch (dbError) {
-            console.error("Database error:", dbError)
-          }
-        }
+        // Handle successful payment
         break
-      }
+
+      case 'invoice.payment_failed':
+        const failedInvoice = event.data.object as Stripe.Invoice
+        console.log('Payment failed:', failedInvoice.id)
+        
+        // Handle failed payment
+        break
 
       default:
-        console.log(`🤷 Unhandled event type: ${event.type}`)
+        console.log(`Unhandled event type: ${event.type}`)
     }
 
     return NextResponse.json({ 
-      received: true, 
-      type: event.type,
-      timestamp: new Date().toISOString()
+      success: true, 
+      received: true 
     })
-  } catch (err: any) {
-    console.error("❌ Webhook error:", err)
-    return new NextResponse(`Webhook Error: ${err?.message || "Unknown error"}`, {
-      status: 400,
-    })
+  } catch (error) {
+    console.error('Webhook error:', error)
+    return NextResponse.json(
+      { success: false, error: 'Webhook processing failed' },
+      { status: 500 }
+    )
   }
 }

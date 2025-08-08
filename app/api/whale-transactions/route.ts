@@ -1,72 +1,96 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { Connection, PublicKey } from '@solana/web3.js'
 
-const SOLANA_RPC_URL = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com'
-const CHONK_TOKEN_ADDRESS = process.env.NEXT_PUBLIC_MINT_TOKEN_ADDRESS || 'DnUsQnwNot38V9JbisNC18VHZkae1eKK5N2Dgy55pump'
-
-// Mock whale wallets for demo - in production, these would come from your database
-const WHALE_WALLETS = [
-  '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU',
-  '9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM',
-  '5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1',
-  'DnUsQnwNot38V9JbisNC18VHZkae1eKK5N2Dgy55pump'
-]
+interface WhaleTransaction {
+  id: string
+  signature: string
+  wallet: string
+  type: 'buy' | 'sell' | 'transfer'
+  amount: number
+  usdValue: number
+  timestamp: string
+  priceImpact?: number
+}
 
 export async function GET(request: NextRequest) {
   try {
-    const connection = new Connection(SOLANA_RPC_URL, 'confirmed')
-    
-    // Generate realistic mock transactions for demo
-    const mockTransactions = [
+    const { searchParams } = new URL(request.url)
+    const limit = parseInt(searchParams.get('limit') || '50')
+    const wallet = searchParams.get('wallet')
+    const type = searchParams.get('type')
+
+    // Mock data for whale transactions
+    const mockTransactions: WhaleTransaction[] = [
       {
         id: '1',
-        walletAddress: WHALE_WALLETS[0],
-        signature: 'mock_signature_1',
-        transactionType: 'buy' as const,
-        tokenSymbol: 'CHONK',
-        amount: 2500000,
+        signature: '5j7K8L9M0N1O2P3Q4R5S6T7U8V9W0X1Y2Z3A4B5C6D7E8F9G0H1I2J3K4L5M6N7O8P9Q0R1S2T3U4V5W6X7Y8Z9',
+        wallet: '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU',
+        type: 'buy',
+        amount: 1250000,
         usdValue: 125000,
-        blockTime: new Date(Date.now() - 300000).toISOString(), // 5 minutes ago
-        knownEntity: 'Large Holder'
+        timestamp: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
+        priceImpact: 2.3
       },
       {
         id: '2',
-        walletAddress: WHALE_WALLETS[1],
-        signature: 'mock_signature_2',
-        transactionType: 'sell' as const,
-        tokenSymbol: 'CHONK',
-        amount: 1800000,
-        usdValue: 90000,
-        blockTime: new Date(Date.now() - 600000).toISOString(), // 10 minutes ago
-        knownEntity: 'Exchange Wallet'
+        signature: '4i6J7K8L9M0N1O2P3Q4R5S6T7U8V9W0X1Y2Z3A4B5C6D7E8F9G0H1I2J3K4L5M6N7O8P9Q0R1S2T3U4V5W6X7Y8Z',
+        wallet: 'DRpbCBMxVnDK7maPM5tGv6MvB3v1sRMC7Ybd4dfsEKvn',
+        type: 'sell',
+        amount: 890000,
+        usdValue: 89000,
+        timestamp: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+        priceImpact: -1.8
       },
       {
         id: '3',
-        walletAddress: WHALE_WALLETS[2],
-        signature: 'mock_signature_3',
-        transactionType: 'buy' as const,
-        tokenSymbol: 'CHONK',
-        amount: 3200000,
-        usdValue: 160000,
-        blockTime: new Date(Date.now() - 900000).toISOString(), // 15 minutes ago
-        knownEntity: 'High Frequency Trader'
+        signature: '3h5I6J7K8L9M0N1O2P3Q4R5S6T7U8V9W0X1Y2Z3A4B5C6D7E8F9G0H1I2J3K4L5M6N7O8P9Q0R1S2T3U4V5W6X7Y',
+        wallet: 'EQuz4ybZaZbsGGckg2wVqzHBwlvFgvctdvQDiDJRKYmq',
+        type: 'buy',
+        amount: 2100000,
+        usdValue: 210000,
+        timestamp: new Date(Date.now() - 8 * 60 * 1000).toISOString(),
+        priceImpact: 4.1
       },
       {
         id: '4',
-        walletAddress: WHALE_WALLETS[3],
-        signature: 'mock_signature_4',
-        transactionType: 'transfer' as const,
-        tokenSymbol: 'CHONK',
-        amount: 5000000,
-        usdValue: 250000,
-        blockTime: new Date(Date.now() - 1200000).toISOString(), // 20 minutes ago
-        knownEntity: 'Token Creator'
+        signature: '2g4H5I6J7K8L9M0N1O2P3Q4R5S6T7U8V9W0X1Y2Z3A4B5C6D7E8F9G0H1I2J3K4L5M6N7O8P9Q0R1S2T3U4V5W6X',
+        wallet: 'FVwqJBjdxgKsQqZpVMdqGNq1wHjKjHgFdSaAsSdFgHjK',
+        type: 'transfer',
+        amount: 750000,
+        usdValue: 75000,
+        timestamp: new Date(Date.now() - 12 * 60 * 1000).toISOString()
+      },
+      {
+        id: '5',
+        signature: '1f3G4H5I6J7K8L9M0N1O2P3Q4R5S6T7U8V9W0X1Y2Z3A4B5C6D7E8F9G0H1I2J3K4L5M6N7O8P9Q0R1S2T3U4V5W',
+        wallet: 'GWxrJCkexhLtRrZqWNeqHOr2xIkKkIhGeSbBtTeFhIkL',
+        type: 'sell',
+        amount: 1800000,
+        usdValue: 180000,
+        timestamp: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
+        priceImpact: -3.2
       }
     ]
 
+    let filteredTransactions = mockTransactions
+
+    // Filter by wallet if specified
+    if (wallet) {
+      filteredTransactions = filteredTransactions.filter(tx => tx.wallet === wallet)
+    }
+
+    // Filter by type if specified
+    if (type && ['buy', 'sell', 'transfer'].includes(type)) {
+      filteredTransactions = filteredTransactions.filter(tx => tx.type === type)
+    }
+
+    // Apply limit
+    const limitedTransactions = filteredTransactions.slice(0, limit)
+
     return NextResponse.json({
       success: true,
-      transactions: mockTransactions
+      data: limitedTransactions,
+      total: filteredTransactions.length,
+      limit
     })
   } catch (error) {
     console.error('Error fetching whale transactions:', error)

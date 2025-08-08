@@ -1,4 +1,4 @@
-import { createAppKit } from '@reown/appkit'
+import { createAppKit } from '@reown/appkit/react'
 import { SolanaAdapter } from '@reown/appkit-adapter-solana/react'
 import { solana, solanaTestnet, solanaDevnet } from '@reown/appkit/networks'
 import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets'
@@ -6,28 +6,27 @@ import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adap
 // Get projectId from https://cloud.reown.com
 const projectId = process.env.NEXT_PUBLIC_REOWN_PROJECT_ID || 'your-project-id'
 
-const metadata = {
-  name: 'CHONK9K Whale Manager',
-  description: 'Professional Solana Whale Tracking Platform',
-  url: 'https://chonkpump.vercel.app',
-  icons: ['https://chonkpump.vercel.app/icon.png']
-}
-
-// Create Solana adapter
+// Set up Solana Adapter
 const solanaWeb3JsAdapter = new SolanaAdapter({
   wallets: [new PhantomWalletAdapter(), new SolflareWalletAdapter()]
 })
 
-// Create modal
-export const modal = createAppKit({
+// Create the modal
+const modal = createAppKit({
   adapters: [solanaWeb3JsAdapter],
-  networks: [solana, solanaTestnet, solanaDevnet],
-  metadata,
   projectId,
-  features: {
-    analytics: true,
-    email: false,
-    socials: false
+  networks: [solana, solanaTestnet, solanaDevnet],
+  defaultNetwork: solana,
+  metadata: {
+    name: 'CHONK9K Whale Manager',
+    description: 'Professional Solana Whale Tracking Platform',
+    url: 'https://chonkpump.vercel.app',
+    icons: ['https://chonkpump.vercel.app/icon.png']
+  },
+  themeMode: 'dark',
+  themeVariables: {
+    '--w3m-color-mix': '#00D2FF',
+    '--w3m-color-mix-strength': 20
   }
 })
 

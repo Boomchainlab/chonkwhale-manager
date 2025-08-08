@@ -1,36 +1,94 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-// Mock alerts storage - in production, use your database
-let mockAlerts = [
+interface Alert {
+  id: string
+  name: string
+  type: 'volume' | 'price' | 'whale_activity' | 'transaction_size'
+  condition: 'above' | 'below' | 'equals'
+  threshold: number
+  isActive: boolean
+  triggeredCount: number
+  lastTriggered?: string
+  createdAt: string
+  updatedAt: string
+}
+
+// Mock alerts storage (same as in route.ts - in production this would be shared via database)
+let mockAlerts: Alert[] = [
   {
     id: '1',
-    name: 'Large Buy Alert',
-    condition: 'transaction_above',
-    threshold: 100000,
+    name: 'Large Volume Alert',
+    type: 'volume',
+    condition: 'above',
+    threshold: 1000000,
     isActive: true,
-    triggered: false,
-    lastTriggered: undefined
+    triggeredCount: 3,
+    lastTriggered: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+    updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
   },
   {
     id: '2',
-    name: 'High Volume Alert',
-    condition: 'volume_above',
-    threshold: 500000,
+    name: 'Price Drop Alert',
+    type: 'price',
+    condition: 'below',
+    threshold: 0.05,
     isActive: true,
-    triggered: true,
-    lastTriggered: new Date(Date.now() - 3600000).toISOString()
+    triggeredCount: 0,
+    createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+    updatedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: '3',
+    name: 'Whale Activity Spike',
+    type: 'whale_activity',
+    condition: 'above',
+    threshold: 50,
+    isActive: false,
+    triggeredCount: 12,
+    lastTriggered: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+    createdAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
+    updatedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
   }
 ]
 
-export async function PATCH(
+export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = params
+    const alertId = params.id
+    const alert = mockAlerts.find(a => a.id === alertId)
+
+    if (!alert) {
+      return NextResponse.json(
+        { success: false, error: 'Alert not found' },
+        { status: 404 }
+      )
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: alert
+    })
+  } catch (error) {
+    console.error('Error fetching alert:', error)
+    return NextResponse.json(
+      { success: false, error: 'Failed to fetch alert' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const alertId = params.id
     const body = await request.json()
     
-    const alertIndex = mockAlerts.findIndex(alert => alert.id === id)
+    const alertIndex = mockAlerts.findIndex(a => a.id === alertId)
     if (alertIndex === -1) {
       return NextResponse.json(
         { success: false, error: 'Alert not found' },
@@ -38,11 +96,18 @@ export async function PATCH(
       )
     }
 
-    mockAlerts[alertIndex] = { ...mockAlerts[alertIndex], ...body }
+    // Update alert
+    const updatedAlert = {
+      ...mockAlerts[alertIndex],
+      ...body,
+      updatedAt: new Date().toISOString()
+    }
+
+    mockAlerts[alertIndex] = updatedAlert
 
     return NextResponse.json({
       success: true,
-      alert: mockAlerts[alertIndex]
+      data: updatedAlert
     })
   } catch (error) {
     console.error('Error updating alert:', error)
@@ -58,9 +123,9 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = params
+    const alertId = params.id
+    const alertIndex = mockAlerts.findIndex(a => a.id === alertId)
     
-    const alertIndex = mockAlerts.findIndex(alert => alert.id === id)
     if (alertIndex === -1) {
       return NextResponse.json(
         { success: false, error: 'Alert not found' },
@@ -68,6 +133,7 @@ export async function DELETE(
       )
     }
 
+    // Remove alert
     mockAlerts.splice(alertIndex, 1)
 
     return NextResponse.json({

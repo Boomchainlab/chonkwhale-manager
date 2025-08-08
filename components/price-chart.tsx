@@ -1,89 +1,126 @@
 'use client'
 
-import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { TrendingUp, TrendingDown, RefreshCw } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import { TrendingUp, BarChart3 } from 'lucide-react'
+import { useState, useEffect } from 'react'
 
 interface PriceData {
-  time: string
+  timestamp: string
   price: number
   volume: number
 }
 
+interface PriceStats {
+  currentPrice: number
+  change24h: number
+  changePercent24h: number
+  volume24h: number
+  marketCap: number
+  high24h: number
+  low24h: number
+}
+
 export function PriceChart() {
   const [priceData, setPriceData] = useState<PriceData[]>([])
-  const [currentPrice, setCurrentPrice] = useState(0.00012)
+  const [stats, setStats] = useState<PriceStats | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [timeframe, setTimeframe] = useState<'1H' | '24H' | '7D' | '30D'>('24H')
+
+  const fetchPriceData = async () => {
+    setIsLoading(true)
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    
+    // Generate mock price data
+    const now = new Date()
+    const mockData: PriceData[] = []
+    const basePrice = 0.1
+    
+    for (let i = 23; i >= 0; i--) {
+      const timestamp = new Date(now.getTime() - i * 60 * 60 * 1000)
+      const randomChange = (Math.random() - 0.5) * 0.02
+      const price = basePrice + randomChange + Math.sin(i * 0.5) * 0.01
+      const volume = Math.random() * 1000000 + 500000
+      
+      mockData.push({
+        timestamp: timestamp.toISOString(),
+        price: Math.max(0.05, price),
+        volume
+      })
+    }
+    
+    const currentPrice = mockData[mockData.length - 1].price
+    const previousPrice = mockData[0].price
+    const change24h = currentPrice - previousPrice
+    const changePercent24h = (change24h / previousPrice) * 100
+    
+    const mockStats: PriceStats = {
+      currentPrice,
+      change24h,
+      changePercent24h,
+      volume24h: mockData.reduce((sum, item) => sum + item.volume, 0),
+      marketCap: currentPrice * 1000000000, // Assuming 1B total supply
+      high24h: Math.max(...mockData.map(d => d.price)),
+      low24h: Math.min(...mockData.map(d => d.price))
+    }
+    
+    setPriceData(mockData)
+    setStats(mockStats)
+    setIsLoading(false)
+  }
 
   useEffect(() => {
-    // Generate mock price data for the last 24 hours
-    const generatePriceData = () => {
-      const data: PriceData[] = []
-      const now = new Date()
-      let price = 0.00012
-
-      for (let i = 23; i >= 0; i--) {
-        const time = new Date(now.getTime() - i * 60 * 60 * 1000)
-        price += (Math.random() - 0.5) * 0.000005
-        price = Math.max(0.00008, Math.min(0.00020, price))
-        
-        data.push({
-          time: time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-          price: Number(price.toFixed(6)),
-          volume: Math.floor(Math.random() * 1000000 + 500000)
-        })
-      }
-
-      return data
-    }
-
-    const initialData = generatePriceData()
-    setPriceData(initialData)
-    setCurrentPrice(initialData[initialData.length - 1].price)
-
-    // Update price every 5 seconds
-    const interval = setInterval(() => {
-      setPriceData(prev => {
-        const newData = [...prev]
-        const lastPrice = newData[newData.length - 1].price
-        const newPrice = lastPrice + (Math.random() - 0.5) * 0.000002
-        const clampedPrice = Math.max(0.00008, Math.min(0.00020, newPrice))
-        
-        newData.push({
-          time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-          price: Number(clampedPrice.toFixed(6)),
-          volume: Math.floor(Math.random() * 1000000 + 500000)
-        })
-
-        // Keep only last 24 data points
-        if (newData.length > 24) {
-          newData.shift()
-        }
-
-        setCurrentPrice(clampedPrice)
-        return newData
-      })
-    }, 5000)
-
+    fetchPriceData()
+    const interval = setInterval(fetchPriceData, 60000) // Update every minute
     return () => clearInterval(interval)
-  }, [])
-
-  const priceChange = priceData.length > 1 
-    ? ((currentPrice - priceData[0].price) / priceData[0].price) * 100
-    : 0
+  }, [timeframe])
 
   const formatPrice = (price: number) => {
-    return `$${price.toFixed(6)}`
+    return `$${price.toFixed(4)}`
   }
 
   const formatVolume = (volume: number) => {
-    if (volume >= 1000000) {
-      return `${(volume / 1000000).toFixed(1)}M`
-    }
-    if (volume >= 1000) {
-      return `${(volume / 1000).toFixed(1)}K`
-    }
-    return volume.toString()
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      notation: 'compact',
+      maximumFractionDigits: 1
+    }).format(volume)
+  }
+
+  const formatMarketCap = (marketCap: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      notation: 'compact',
+      maximumFractionDigits: 1
+    }).format(marketCap)
+  }
+
+  const formatTime = (timestamp: string) => {
+    return new Date(timestamp).toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
+
+  if (isLoading || !stats) {
+    return (
+      <Card className="bg-gray-800/50 border-gray-700">
+        <CardHeader>
+          <CardTitle className="text-white">CHONK Price Chart</CardTitle>
+          <CardDescription className="text-gray-400">Loading price data...</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[400px] flex items-center justify-center">
+            <RefreshCw className="w-8 h-8 animate-spin text-gray-400" />
+          </div>
+        </CardContent>
+      </Card>
+    )
   }
 
   return (
@@ -92,60 +129,91 @@ export function PriceChart() {
         <div className="flex items-center justify-between">
           <div>
             <CardTitle className="text-white flex items-center gap-2">
-              <BarChart3 className="h-5 w-5" />
-              CHONK9K Price Chart
+              CHONK Price Chart
+              <Badge variant={stats.changePercent24h >= 0 ? 'default' : 'destructive'} className="ml-2">
+                {stats.changePercent24h >= 0 ? (
+                  <TrendingUp className="w-3 h-3 mr-1" />
+                ) : (
+                  <TrendingDown className="w-3 h-3 mr-1" />
+                )}
+                {stats.changePercent24h >= 0 ? '+' : ''}{stats.changePercent24h.toFixed(2)}%
+              </Badge>
             </CardTitle>
-            <CardDescription>
-              24-hour price movement and volume
+            <CardDescription className="text-gray-400">
+              Real-time CHONK token price and volume
             </CardDescription>
           </div>
-          <div className="text-right">
-            <div className="text-2xl font-bold text-white">
-              {formatPrice(currentPrice)}
-            </div>
-            <div className={`flex items-center gap-1 text-sm ${
-              priceChange >= 0 ? 'text-green-400' : 'text-red-400'
-            }`}>
-              <TrendingUp className={`h-3 w-3 ${priceChange < 0 ? 'rotate-180' : ''}`} />
-              {priceChange >= 0 ? '+' : ''}{priceChange.toFixed(2)}% (24h)
-            </div>
+          <div className="flex gap-2">
+            {(['1H', '24H', '7D', '30D'] as const).map((tf) => (
+              <Button
+                key={tf}
+                variant={timeframe === tf ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setTimeframe(tf)}
+                className="text-xs"
+              >
+                {tf}
+              </Button>
+            ))}
           </div>
         </div>
       </CardHeader>
       <CardContent>
-        <div className="h-[400px] w-full">
+        {/* Price Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div className="text-center">
+            <p className="text-sm text-gray-400">Current Price</p>
+            <p className="text-lg font-bold text-white">{formatPrice(stats.currentPrice)}</p>
+          </div>
+          <div className="text-center">
+            <p className="text-sm text-gray-400">24h Volume</p>
+            <p className="text-lg font-bold text-white">{formatVolume(stats.volume24h)}</p>
+          </div>
+          <div className="text-center">
+            <p className="text-sm text-gray-400">Market Cap</p>
+            <p className="text-lg font-bold text-white">{formatMarketCap(stats.marketCap)}</p>
+          </div>
+          <div className="text-center">
+            <p className="text-sm text-gray-400">24h Range</p>
+            <p className="text-sm text-white">
+              {formatPrice(stats.low24h)} - {formatPrice(stats.high24h)}
+            </p>
+          </div>
+        </div>
+
+        {/* Price Chart */}
+        <div className="h-[300px]">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={priceData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
               <XAxis 
-                dataKey="time" 
+                dataKey="timestamp"
+                tickFormatter={formatTime}
                 stroke="#9CA3AF"
                 fontSize={12}
               />
               <YAxis 
+                tickFormatter={formatPrice}
                 stroke="#9CA3AF"
                 fontSize={12}
-                tickFormatter={formatPrice}
               />
               <Tooltip
                 contentStyle={{
                   backgroundColor: '#1F2937',
                   border: '1px solid #374151',
                   borderRadius: '8px',
-                  color: '#F9FAFB'
+                  color: '#F3F4F6'
                 }}
-                formatter={(value: number, name: string) => [
-                  name === 'price' ? formatPrice(value) : formatVolume(value),
-                  name === 'price' ? 'Price' : 'Volume'
-                ]}
+                labelFormatter={(label) => `Time: ${formatTime(label)}`}
+                formatter={(value: number) => [formatPrice(value), 'Price']}
               />
               <Line
                 type="monotone"
                 dataKey="price"
-                stroke="#8B5CF6"
+                stroke={stats.changePercent24h >= 0 ? '#10B981' : '#EF4444'}
                 strokeWidth={2}
                 dot={false}
-                activeDot={{ r: 4, stroke: '#8B5CF6', strokeWidth: 2 }}
+                activeDot={{ r: 4, fill: stats.changePercent24h >= 0 ? '#10B981' : '#EF4444' }}
               />
             </LineChart>
           </ResponsiveContainer>
