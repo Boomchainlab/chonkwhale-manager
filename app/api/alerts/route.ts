@@ -1,24 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-// Mock alerts storage - in production, use your database
-let mockAlerts = [
+interface Alert {
+  id: string
+  name: string
+  condition: string
+  threshold: number
+  isActive: boolean
+  triggered: boolean
+  lastTriggered?: string
+  createdAt: string
+  userId?: string
+}
+
+// In-memory storage for demo (use database in production)
+let alerts: Alert[] = [
   {
     id: '1',
-    name: 'Large Buy Alert',
-    condition: 'transaction_above',
-    threshold: 100000,
+    name: 'Large Buy Orders',
+    condition: 'volume_above',
+    threshold: 1000000,
     isActive: true,
     triggered: false,
-    lastTriggered: undefined
+    createdAt: new Date().toISOString()
   },
   {
     id: '2',
-    name: 'High Volume Alert',
-    condition: 'volume_above',
-    threshold: 500000,
+    name: 'Whale Dump Alert',
+    condition: 'sell_volume_above',
+    threshold: 5000000,
     isActive: true,
     triggered: true,
-    lastTriggered: new Date(Date.now() - 3600000).toISOString() // 1 hour ago
+    lastTriggered: new Date(Date.now() - 1800000).toISOString(),
+    createdAt: new Date(Date.now() - 86400000).toISOString()
   }
 ]
 
@@ -26,7 +39,8 @@ export async function GET(request: NextRequest) {
   try {
     return NextResponse.json({
       success: true,
-      alerts: mockAlerts
+      alerts,
+      count: alerts.length
     })
   } catch (error) {
     console.error('Error fetching alerts:', error)
@@ -42,17 +56,24 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { name, condition, threshold } = body
 
-    const newAlert = {
-      id: Date.now().toString(),
+    if (!name || !condition || !threshold) {
+      return NextResponse.json(
+        { success: false, error: 'Missing required fields' },
+        { status: 400 }
+      )
+    }
+
+    const newAlert: Alert = {
+      id: Math.random().toString(36).substr(2, 9),
       name,
       condition,
       threshold: Number(threshold),
       isActive: true,
       triggered: false,
-      lastTriggered: undefined
+      createdAt: new Date().toISOString()
     }
 
-    mockAlerts.push(newAlert)
+    alerts.push(newAlert)
 
     return NextResponse.json({
       success: true,

@@ -1,235 +1,240 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
-import { BellIcon, PlusIcon, TrashIcon } from 'lucide-react'
+import { Bell, Plus, Trash2, Edit } from 'lucide-react'
+import { useState } from 'react'
 
 interface Alert {
   id: string
   name: string
-  condition: string
-  threshold: number
-  isActive: boolean
-  triggered: boolean
-  lastTriggered?: string
+  type: 'volume' | 'price' | 'whale_activity'
+  condition: 'above' | 'below'
+  value: number
+  enabled: boolean
+  triggered: number
 }
 
 export function AlertsPanel() {
-  const [alerts, setAlerts] = useState<Alert[]>([])
-  const [showCreateForm, setShowCreateForm] = useState(false)
+  const [alerts, setAlerts] = useState<Alert[]>([
+    {
+      id: '1',
+      name: 'Large Volume Alert',
+      type: 'volume',
+      condition: 'above',
+      value: 1000000,
+      enabled: true,
+      triggered: 3
+    },
+    {
+      id: '2',
+      name: 'Price Drop Alert',
+      type: 'price',
+      condition: 'below',
+      value: 0.05,
+      enabled: true,
+      triggered: 0
+    },
+    {
+      id: '3',
+      name: 'Whale Activity Spike',
+      type: 'whale_activity',
+      condition: 'above',
+      value: 50,
+      enabled: false,
+      triggered: 12
+    }
+  ])
+
   const [newAlert, setNewAlert] = useState({
     name: '',
-    condition: 'volume_above',
-    threshold: 100000
+    type: 'volume' as const,
+    condition: 'above' as const,
+    value: 0
   })
 
-  useEffect(() => {
-    fetchAlerts()
-  }, [])
-
-  const fetchAlerts = async () => {
-    try {
-      const response = await fetch('/api/alerts')
-      const data = await response.json()
-      setAlerts(data.alerts || [])
-    } catch (error) {
-      console.error('Failed to fetch alerts:', error)
-    }
-  }
-
-  const createAlert = async () => {
-    try {
-      const response = await fetch('/api/alerts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newAlert)
-      })
-      
-      if (response.ok) {
-        setNewAlert({ name: '', condition: 'volume_above', threshold: 100000 })
-        setShowCreateForm(false)
-        fetchAlerts()
+  const addAlert = () => {
+    if (newAlert.name && newAlert.value > 0) {
+      const alert: Alert = {
+        id: Date.now().toString(),
+        ...newAlert,
+        enabled: true,
+        triggered: 0
       }
-    } catch (error) {
-      console.error('Failed to create alert:', error)
+      setAlerts([...alerts, alert])
+      setNewAlert({ name: '', type: 'volume', condition: 'above', value: 0 })
     }
   }
 
-  const deleteAlert = async (id: string) => {
-    try {
-      const response = await fetch(`/api/alerts/${id}`, {
-        method: 'DELETE'
-      })
-      
-      if (response.ok) {
-        fetchAlerts()
-      }
-    } catch (error) {
-      console.error('Failed to delete alert:', error)
+  const toggleAlert = (id: string) => {
+    setAlerts(alerts.map(alert => 
+      alert.id === id ? { ...alert, enabled: !alert.enabled } : alert
+    ))
+  }
+
+  const deleteAlert = (id: string) => {
+    setAlerts(alerts.filter(alert => alert.id !== id))
+  }
+
+  const getAlertTypeLabel = (type: string) => {
+    switch (type) {
+      case 'volume': return 'Volume'
+      case 'price': return 'Price'
+      case 'whale_activity': return 'Whale Activity'
+      default: return type
     }
   }
 
-  const toggleAlert = async (id: string, isActive: boolean) => {
-    try {
-      const response = await fetch(`/api/alerts/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isActive: !isActive })
-      })
-      
-      if (response.ok) {
-        fetchAlerts()
-      }
-    } catch (error) {
-      console.error('Failed to toggle alert:', error)
-    }
-  }
-
-  const formatThreshold = (condition: string, threshold: number) => {
-    switch (condition) {
-      case 'volume_above':
-        return `Volume > $${threshold.toLocaleString()}`
-      case 'transaction_above':
-        return `Transaction > $${threshold.toLocaleString()}`
-      case 'whale_count_above':
-        return `Whales > ${threshold}`
-      default:
-        return `${threshold}`
+  const formatValue = (type: string, value: number) => {
+    switch (type) {
+      case 'volume': return `$${value.toLocaleString()}`
+      case 'price': return `$${value}`
+      case 'whale_activity': return `${value} transactions`
+      default: return value.toString()
     }
   }
 
   return (
-    <Card className="bg-gray-800 border-gray-700">
-      <CardHeader>
-        <CardTitle className="text-white flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <BellIcon className="h-5 w-5" />
-            <span>Whale Alerts</span>
-          </div>
-          <Button
-            size="sm"
-            onClick={() => setShowCreateForm(!showCreateForm)}
-            className="bg-green-600 hover:bg-green-700"
-          >
-            <PlusIcon className="h-4 w-4" />
-          </Button>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {showCreateForm && (
-          <div className="p-4 bg-gray-700/50 rounded-lg space-y-4">
-            <div>
-              <Label htmlFor="alert-name" className="text-white">Alert Name</Label>
+    <div className="space-y-6">
+      {/* Create New Alert */}
+      <Card className="bg-gray-800/50 border-gray-700">
+        <CardHeader>
+          <CardTitle className="text-white flex items-center gap-2">
+            <Plus className="w-5 h-5" />
+            Create New Alert
+          </CardTitle>
+          <CardDescription className="text-gray-400">
+            Set up custom alerts for whale activity monitoring
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="alert-name" className="text-gray-300">Alert Name</Label>
               <Input
                 id="alert-name"
+                placeholder="Enter alert name"
                 value={newAlert.name}
                 onChange={(e) => setNewAlert({ ...newAlert, name: e.target.value })}
-                placeholder="Large whale transaction"
-                className="bg-gray-700 border-gray-600 text-white"
+                className="bg-gray-900 border-gray-600 text-white"
               />
             </div>
-            <div>
-              <Label htmlFor="alert-condition" className="text-white">Condition</Label>
-              <Select
-                value={newAlert.condition}
-                onValueChange={(value) => setNewAlert({ ...newAlert, condition: value })}
-              >
-                <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
+            <div className="space-y-2">
+              <Label htmlFor="alert-type" className="text-gray-300">Alert Type</Label>
+              <Select value={newAlert.type} onValueChange={(value: any) => setNewAlert({ ...newAlert, type: value })}>
+                <SelectTrigger className="bg-gray-900 border-gray-600 text-white">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent className="bg-gray-700 border-gray-600">
-                  <SelectItem value="volume_above">Volume Above</SelectItem>
-                  <SelectItem value="transaction_above">Transaction Above</SelectItem>
-                  <SelectItem value="whale_count_above">Whale Count Above</SelectItem>
+                <SelectContent className="bg-gray-800 border-gray-600">
+                  <SelectItem value="volume">Volume</SelectItem>
+                  <SelectItem value="price">Price</SelectItem>
+                  <SelectItem value="whale_activity">Whale Activity</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label htmlFor="alert-threshold" className="text-white">Threshold</Label>
+            <div className="space-y-2">
+              <Label htmlFor="alert-condition" className="text-gray-300">Condition</Label>
+              <Select value={newAlert.condition} onValueChange={(value: any) => setNewAlert({ ...newAlert, condition: value })}>
+                <SelectTrigger className="bg-gray-900 border-gray-600 text-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-gray-800 border-gray-600">
+                  <SelectItem value="above">Above</SelectItem>
+                  <SelectItem value="below">Below</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="alert-value" className="text-gray-300">Value</Label>
               <Input
-                id="alert-threshold"
+                id="alert-value"
                 type="number"
-                value={newAlert.threshold}
-                onChange={(e) => setNewAlert({ ...newAlert, threshold: Number(e.target.value) })}
-                className="bg-gray-700 border-gray-600 text-white"
+                placeholder="Enter threshold value"
+                value={newAlert.value || ''}
+                onChange={(e) => setNewAlert({ ...newAlert, value: parseFloat(e.target.value) || 0 })}
+                className="bg-gray-900 border-gray-600 text-white"
               />
             </div>
-            <div className="flex space-x-2">
-              <Button onClick={createAlert} className="bg-green-600 hover:bg-green-700">
-                Create Alert
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => setShowCreateForm(false)}
-                className="border-gray-600 text-gray-300 hover:bg-gray-700"
-              >
-                Cancel
-              </Button>
-            </div>
           </div>
-        )}
+          <Button onClick={addAlert} className="w-full bg-blue-600 hover:bg-blue-700">
+            <Plus className="w-4 h-4 mr-2" />
+            Create Alert
+          </Button>
+        </CardContent>
+      </Card>
 
-        <div className="space-y-3">
-          {alerts.length === 0 ? (
-            <div className="text-center py-4 text-gray-400">
-              No alerts configured yet
-            </div>
-          ) : (
-            alerts.map((alert) => (
+      {/* Active Alerts */}
+      <Card className="bg-gray-800/50 border-gray-700">
+        <CardHeader>
+          <CardTitle className="text-white flex items-center gap-2">
+            <Bell className="w-5 h-5" />
+            Active Alerts ({alerts.filter(a => a.enabled).length})
+          </CardTitle>
+          <CardDescription className="text-gray-400">
+            Manage your whale tracking alerts
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {alerts.map((alert) => (
               <div
                 key={alert.id}
-                className="flex items-center justify-between p-3 bg-gray-700/50 rounded-lg"
+                className="flex items-center justify-between p-4 rounded-lg bg-gray-900/50 border border-gray-700"
               >
-                <div className="flex-1">
-                  <div className="flex items-center space-x-2">
-                    <span className="text-white font-medium">{alert.name}</span>
-                    <Badge
-                      variant={alert.isActive ? "default" : "secondary"}
-                      className={alert.isActive ? "bg-green-600" : "bg-gray-600"}
-                    >
-                      {alert.isActive ? "Active" : "Inactive"}
-                    </Badge>
-                    {alert.triggered && (
-                      <Badge variant="destructive">Triggered</Badge>
-                    )}
-                  </div>
-                  <div className="text-sm text-gray-400">
-                    {formatThreshold(alert.condition, alert.threshold)}
-                  </div>
-                  {alert.lastTriggered && (
-                    <div className="text-xs text-gray-500">
-                      Last: {new Date(alert.lastTriggered).toLocaleString()}
+                <div className="flex items-center space-x-4">
+                  <Switch
+                    checked={alert.enabled}
+                    onCheckedChange={() => toggleAlert(alert.id)}
+                  />
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h4 className="font-medium text-white">{alert.name}</h4>
+                      <Badge variant="outline" className="text-xs">
+                        {getAlertTypeLabel(alert.type)}
+                      </Badge>
                     </div>
-                  )}
+                    <p className="text-sm text-gray-400">
+                      Trigger when {alert.condition} {formatValue(alert.type, alert.value)}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Triggered {alert.triggered} times
+                    </p>
+                  </div>
                 </div>
                 <div className="flex items-center space-x-2">
                   <Button
+                    variant="ghost"
                     size="sm"
-                    variant="outline"
-                    onClick={() => toggleAlert(alert.id, alert.isActive)}
-                    className="border-gray-600 text-gray-300 hover:bg-gray-700"
+                    className="text-gray-400 hover:text-white"
                   >
-                    {alert.isActive ? "Disable" : "Enable"}
+                    <Edit className="w-4 h-4" />
                   </Button>
                   <Button
+                    variant="ghost"
                     size="sm"
-                    variant="outline"
                     onClick={() => deleteAlert(alert.id)}
-                    className="border-red-600 text-red-400 hover:bg-red-600/20"
+                    className="text-red-400 hover:text-red-300"
                   >
-                    <TrashIcon className="h-4 w-4" />
+                    <Trash2 className="w-4 h-4" />
                   </Button>
                 </div>
               </div>
-            ))
-          )}
-        </div>
-      </CardContent>
-    </Card>
+            ))}
+            {alerts.length === 0 && (
+              <div className="text-center py-8 text-gray-400">
+                <Bell className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p>No alerts configured yet</p>
+                <p className="text-sm">Create your first alert above</p>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   )
 }

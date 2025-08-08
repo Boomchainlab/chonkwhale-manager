@@ -1,24 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-// Mock alerts storage - in production, use your database
-let mockAlerts = [
+interface Alert {
+  id: string
+  name: string
+  condition: string
+  threshold: number
+  isActive: boolean
+  triggered: boolean
+  lastTriggered?: string
+  createdAt: string
+}
+
+// In-memory storage for demo (use database in production)
+let alerts: Alert[] = [
   {
     id: '1',
-    name: 'Large Buy Alert',
-    condition: 'transaction_above',
-    threshold: 100000,
+    name: 'Large Buy Orders',
+    condition: 'volume_above',
+    threshold: 1000000,
     isActive: true,
     triggered: false,
-    lastTriggered: undefined
+    createdAt: new Date().toISOString()
   },
   {
     id: '2',
-    name: 'High Volume Alert',
-    condition: 'volume_above',
-    threshold: 500000,
+    name: 'Whale Dump Alert',
+    condition: 'sell_volume_above',
+    threshold: 5000000,
     isActive: true,
     triggered: true,
-    lastTriggered: new Date(Date.now() - 3600000).toISOString()
+    lastTriggered: new Date(Date.now() - 1800000).toISOString(),
+    createdAt: new Date(Date.now() - 86400000).toISOString()
   }
 ]
 
@@ -30,7 +42,7 @@ export async function PATCH(
     const { id } = params
     const body = await request.json()
     
-    const alertIndex = mockAlerts.findIndex(alert => alert.id === id)
+    const alertIndex = alerts.findIndex(alert => alert.id === id)
     if (alertIndex === -1) {
       return NextResponse.json(
         { success: false, error: 'Alert not found' },
@@ -38,11 +50,11 @@ export async function PATCH(
       )
     }
 
-    mockAlerts[alertIndex] = { ...mockAlerts[alertIndex], ...body }
+    alerts[alertIndex] = { ...alerts[alertIndex], ...body }
 
     return NextResponse.json({
       success: true,
-      alert: mockAlerts[alertIndex]
+      alert: alerts[alertIndex]
     })
   } catch (error) {
     console.error('Error updating alert:', error)
@@ -60,7 +72,7 @@ export async function DELETE(
   try {
     const { id } = params
     
-    const alertIndex = mockAlerts.findIndex(alert => alert.id === id)
+    const alertIndex = alerts.findIndex(alert => alert.id === id)
     if (alertIndex === -1) {
       return NextResponse.json(
         { success: false, error: 'Alert not found' },
@@ -68,7 +80,7 @@ export async function DELETE(
       )
     }
 
-    mockAlerts.splice(alertIndex, 1)
+    alerts.splice(alertIndex, 1)
 
     return NextResponse.json({
       success: true,

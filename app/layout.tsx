@@ -1,30 +1,21 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
-import { Toaster } from '@/components/ui/toaster'
+import { WalletProvider } from '@/components/wallet-provider'
+import { ThemeProvider } from '@/components/theme-provider'
+import { Toaster } from '@/components/ui/sonner'
 
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'CHONK9K Whale Manager - Professional Solana Whale Tracking',
-  description: 'Advanced whale tracking and analytics platform for Solana blockchain. Monitor large transactions, set alerts, and track whale activity in real-time.',
-  keywords: 'solana, whale tracking, crypto analytics, blockchain monitoring, CHONK token',
+  title: 'CHONK9K Whale Manager',
+  description: 'Professional Solana Whale Tracking Platform',
+  keywords: ['solana', 'whale', 'tracking', 'crypto', 'defi', 'analytics'],
   authors: [{ name: 'CHONK9K Team' }],
   openGraph: {
     title: 'CHONK9K Whale Manager',
-    description: 'Professional Solana whale tracking platform',
+    description: 'Track Solana whales with professional-grade analytics',
     type: 'website',
-    images: ['/og-image.png'],
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'CHONK9K Whale Manager',
-    description: 'Professional Solana whale tracking platform',
-    images: ['/og-image.png'],
-  },
-  robots: {
-    index: true,
-    follow: true,
   },
     generator: 'v0.dev'
 }
@@ -35,10 +26,19 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        {children}
-        <Toaster />
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem={false}
+          disableTransitionOnChange
+        >
+          <WalletProvider>
+            {children}
+            <Toaster />
+          </WalletProvider>
+        </ThemeProvider>
       </body>
     </html>
   )

@@ -1,18 +1,19 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from 'next/server'
 
-export async function GET() {
-  return NextResponse.json({
-    hasStripeSecret: !!(process.env.STRIPE_SECRET_KEY || process.env.STRIPE_TEST_API_KEY),
-    hasWebhookSecret: !!process.env.STRIPE_WEBHOOK_SECRET,
+export async function GET(request: NextRequest) {
+  // Only return safe, public environment information
+  const envInfo = {
+    nodeEnv: process.env.NODE_ENV || 'development',
+    vercelEnv: process.env.VERCEL_ENV || 'development',
+    hasReownProjectId: !!process.env.NEXT_PUBLIC_REOWN_PROJECT_ID,
+    hasStripeKeys: !!(process.env.STRIPE_SECRET_KEY && process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY),
     hasDatabaseUrl: !!process.env.DATABASE_URL,
-    hasSolanaRpc: !!process.env.SOLANA_RPC_URL,
-    publicEnv: {
-      NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
-      NEXT_PUBLIC_EMAIL_ADDRESS: process.env.NEXT_PUBLIC_EMAIL_ADDRESS,
-      NEXT_PUBLIC_MINT_TOKEN_ADDRESS: process.env.NEXT_PUBLIC_MINT_TOKEN_ADDRESS,
-      NEXT_PUBLIC_WS_URL: process.env.NEXT_PUBLIC_WS_URL
-    },
-    nodeEnv: process.env.NODE_ENV,
+    hasSessionSecret: !!process.env.SESSION_SECRET,
     timestamp: new Date().toISOString()
+  }
+
+  return NextResponse.json({
+    success: true,
+    environment: envInfo
   })
 }
