@@ -93,7 +93,7 @@
     "lucide-react": "^0.454.0",
     "memoizee": "latest",
     "mysql2": "latest",
-    "next": "14.2.16",
+    "next": "15.5.2",
     "next-themes": "latest",
     "openid-client": "latest",
     "passport": "latest",
@@ -133,7 +133,7 @@
     "@types/react-dom": "^18",
     "autoprefixer": "^10.0.1",
     "eslint": "^8",
-    "eslint-config-next": "14.0.4",
+    "eslint-config-next": "15.5.2",
     "postcss": "^8.5",
     "tailwindcss": "^3.3.0",
     "typescript": "^5"
