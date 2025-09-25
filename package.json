@@ -90,7 +90,7 @@
     "kysely": "latest",
     "less": "latest",
     "lightningcss": "latest",
-    "lucide-react": "^0.542.0",
+    "lucide-react": "^0.544.0",
     "memoizee": "latest",
     "mysql2": "latest",
     "next": "15.5.4",
