@@ -128,7 +128,7 @@
     "zod": "latest"
   },
   "devDependencies": {
-    "@types/node": "^22",
+    "@types/node": "^24.0.0",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "autoprefixer": "^10.0.1",
