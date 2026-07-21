@@ -101,7 +101,7 @@
     "pg": "latest",
     "postgres": "latest",
     "prom-client": "latest",
-    "react": "^18",
+    "react": "^19.0.0",
     "react-day-picker": "latest",
     "react-dom": "^18",
     "react-hook-form": "latest",
